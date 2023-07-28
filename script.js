@@ -16,7 +16,7 @@ div.appendChild(eyeIcon);
 
 div.style.position = 'fixed';
 div.style.right = 0;
-div.style.marginRight = '12rem';
+div.style.marginRight = '15rem';
 div.style.marginTop = '10px';
 div.style.color = '#fff';
 div.style.border = 'none';
