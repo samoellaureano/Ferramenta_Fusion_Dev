@@ -14,10 +14,9 @@ eyeIcon.style.fontSize = '18px';
 eyeIcon.style.color = '#fff';
 div.appendChild(eyeIcon);
 
-div.style.position = 'fixed';
-div.style.right = 0;
-div.style.marginRight = '12rem';
-div.style.marginTop = '10px';
+div.style.position = 'absolute';
+div.style.right = '0';
+div.style.top = '9px';
 div.style.color = '#fff';
 div.style.border = 'none';
 div.style.textAlign = 'center';
@@ -28,6 +27,7 @@ div.style.visibility = 'hidden';
 div.style.display = 'flex';
 div.style.flexDirection = 'column-reverse'
 div.style.fontSize = '9px'
+div.style.zIndex = '10'
 div.id = 'divDump';
 
 div.addEventListener('click', function () {
@@ -45,8 +45,9 @@ div.addEventListener('click', function () {
 });
 
 setTimeout(function () {
-    if(document.getElementById("menu-top-view")){
-        document.getElementById("menu-top-view").appendChild(div);
+    if(document.getElementsByClassName("ui-neo-menu-top-search col-xs-offset-0")[0]){
+        var targetElement = document.getElementsByClassName("ui-neo-menu-top-search col-xs-offset-0")[0];
+        targetElement.parentNode.insertBefore(div, targetElement);
     }
 }, 1500);
 
