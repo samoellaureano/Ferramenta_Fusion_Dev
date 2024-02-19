@@ -59,7 +59,7 @@ document.addEventListener('keydown', function (event) {
             saveButton.click();
         }
     }
-    else if (event.key === 'v' && (event.ctrlKey || event.metaKey)) {
+    else if (event.key === 'd' && (event.ctrlKey || event.metaKey)) {
         event.preventDefault();
         var saveButton = document.getElementsByClassName("icon-validate-bpm")[0];
         if (saveButton) {
