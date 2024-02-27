@@ -10,8 +10,15 @@
       "matches": [
         "*://*/fusion/*"
       ],
+      "exclude_matches": [
+        "*://*/fusion/adm/*",
+        "*://*/fusion/portal"
+      ],
       "js": [
         "script.js"
+      ],
+      "css": [
+        "menu.css"
       ]
     }
   ],

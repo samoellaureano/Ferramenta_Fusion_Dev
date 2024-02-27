@@ -1,3 +1,6 @@
+const urlBase = window.location.origin + window.location.pathname;
+const urlSemFusion = urlBase.replace(/\/fusion\/.*$/, '/fusion/');
+
 var link = document.createElement('link');
 link.rel = 'stylesheet';
 link.href = 'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css';
@@ -29,6 +32,37 @@ div.style.flexDirection = 'column-reverse'
 div.style.fontSize = '9px'
 div.style.zIndex = '10'
 div.id = 'divDump';
+
+const divMenu = document.createElement('div');
+divMenu.innerHTML = `
+    <p id=closeMenu>&times;</p>
+    <p id=titleMenu>Menu</p>
+    <ul id="menu">
+        <p><a href="${urlSemFusion}adm/central.jsp" target="_blank">Central</a></p>
+        <li><a href="${urlSemFusion}adm/dumpEForm.jsp" target="_blank">Form Tree</a></li>
+        <li><a href="${urlSemFusion}adm/sql.jsp" target="_blank">SQL</a></li>
+        <li><a href="${urlSemFusion}adm/script.jsp" target="_blank">Script</a></li>
+        <li><a href="${urlSemFusion}adm/log.jsp" target="_blank">Log</a></li>
+        <li><a href="${urlSemFusion}adm/tomcatLog.jsp" target="_blank">TomCatLog</a></li>
+    </ul>
+`;
+//adicionar uma tooltip
+divMenu.title = "Menu de Ferramentas DEV";
+divMenu.id = 'divMenu';
+
+// append divMenu to the body
+document.body.appendChild(divMenu);
+
+// Adiciona um ouvinte de evento de click ao elemento divMenu
+divMenu.addEventListener('click', function () {
+    // Alternar a classe com a animação
+    divMenu.classList.toggle('rotated');
+    document.getElementById('menu').classList.toggle('exibir');
+    document.getElementById('titleMenu').classList.toggle('esconderTitleMenu');
+    document.getElementById('closeMenu').classList.toggle('exibirCloseMenu');
+});
+
+
 
 div.addEventListener('click', function () {
     if (window.top.document.getElementById("onlyCol")) {
