@@ -12,18 +12,39 @@
     top: 50%;
 }
 
-.esconderTitleMenu {
-    display: none;
+@keyframes titleMenuRoteatedIn {
+    0% {
+        transform: rotate(-90deg);
+        margin: 32px 30px 0 0;
+    }
+
+    100% {
+        transform: rotate(0deg);
+        margin: 4px 0 -7px 0px;
+    }
 }
 
-#closeMenu:not(.exibirCloseMenu) {
-    display: none;
+@keyframes titleMenuRoteatedOut {
+    0% {
+        transform: rotate(0deg);
+        margin: 4px 0 -7px 0px;
+    }
+
+    100% {
+        transform: rotate(-90deg);
+        margin: 32px 30px 0 0;
+    }
 }
 
-.exibirCloseMenu {
-    display: flex;
-    justify-content: flex-end;
-    margin: 0 10px;
+.titleMenuRoteated {
+    animation: titleMenuRoteatedIn 0.2s ease-in-out forwards;
+    font-size: 24px;
+    margin: 32px 30px 0 0;
+}
+
+#titleMenu:not(.titleMenuRoteated) {
+    animation: titleMenuRoteatedOut 0.2s ease-in-out forwards;
+    font-size: 17px;
 }
 
 #menu:not(.exibir) {
@@ -48,41 +69,57 @@
 }
 
 #menu>li>a:hover {
-    color: #5e9dbb;
+    background-color: #fff;
+    color: #687587;
     font-weight: bold;
 }
 
-.exibir {
-    flex-direction: column;
-    justify-content: space-evenly;
-    font-size: 15px;
-    height: 90%;
-    display: flex;
+@keyframes exibirLinks {
+    0% {
+        display: none;
+        opacity: 0;
+    }
+
+    50% {
+        flex-direction: column;
+        justify-content: space-evenly;
+        font-size: 15px;
+        height: 90%;
+        display: flex;
+    }
+
+    100% {
+        flex-direction: column;
+        justify-content: space-evenly;
+        font-size: 15px;
+        height: 90%;
+        display: flex;
+        opacity: 1;
+    }
 }
 
-
+.exibir {
+    animation: exibirLinks 0.5s ease-in-out forwards;
+}
 
 /* Definição da animação */
 @keyframes slideIn {
     0% {
-        transform: rotate(-90deg);
         right: -35px;
-        width: 80px;
-        height: 36px;
+        height: 87px;
+        width: 60px;
     }
 
     50% {
         width: 10rem;
         height: 15rem;
         right: 0;
-        transform: rotate(-90deg);
     }
 
     100% {
         width: 10rem;
         height: 15rem;
         right: 0;
-        transform: rotate(0);
     }
 
 }
@@ -99,26 +136,32 @@
         width: 10rem;
         height: 15rem;
         right: 0;
-        transform: rotate(0);
     }
 
     50% {
         right: -35px;
-        width: 80px;
-        height: 36px;
-        transform: rotate(0);
+        height: 87px;
+        width: 60px;
     }
 
     100% {
         right: -35px;
-        width: 80px;
-        height: 36px;
-        transform: rotate(-90deg);
+        height: 87px;
+        width: 60px;
     }
 }
 
 /* Aplicação da animação ao elemento quando a classe rotated é removida */
 #divMenu:not(.rotated) {
     animation: slideOut 0.5s ease-in-out forwards;
+    font-size: 17px;
+}
+
+/* classe aplicada com determinada url */
+.liOutPortal{
+    font-size: 9px;
+}
+
+.titleMenuOutPortal{
     font-size: 17px;
 }

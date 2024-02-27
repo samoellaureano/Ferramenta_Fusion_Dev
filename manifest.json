@@ -1,6 +1,6 @@
 {
   "name": "Ferramenta Fusion DEV",
-  "version": "1.11",
+  "version": "1.12",
   "manifest_version": 3,
   "icons": {
     "128": "icon.png"
@@ -11,8 +11,7 @@
         "*://*/fusion/*"
       ],
       "exclude_matches": [
-        "*://*/fusion/adm/*",
-        "*://*/fusion/portal"
+        "*://*/fusion/adm/*"
       ],
       "js": [
         "script.js"
