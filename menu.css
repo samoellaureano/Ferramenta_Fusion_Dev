@@ -9,6 +9,7 @@
     z-index: 10;
     padding: 5px 0;
     background-color: #687587;
+    top: 50%;
 }
 
 .esconderTitleMenu {
@@ -47,7 +48,8 @@
 }
 
 #menu>li>a:hover {
-    color: #6d6d6d;
+    color: #5e9dbb;
+    font-weight: bold;
 }
 
 .exibir {
@@ -67,7 +69,6 @@
         right: -35px;
         width: 80px;
         height: 36px;
-        top: 80%;
     }
 
     50% {
@@ -75,7 +76,6 @@
         height: 15rem;
         right: 0;
         transform: rotate(-90deg);
-        top: 50%;
     }
 
     100% {
@@ -83,7 +83,6 @@
         height: 15rem;
         right: 0;
         transform: rotate(0);
-        top: 50%;
     }
 
 }
@@ -101,7 +100,6 @@
         height: 15rem;
         right: 0;
         transform: rotate(0);
-        top: 50%;
     }
 
     50% {
@@ -109,7 +107,6 @@
         width: 80px;
         height: 36px;
         transform: rotate(0);
-        top: 80%;
     }
 
     100% {
@@ -117,7 +114,6 @@
         width: 80px;
         height: 36px;
         transform: rotate(-90deg);
-        top: 80%;
     }
 }
 
