@@ -1,30 +1,36 @@
-# Ferramenta Fusion DEV
-A extensão Fusion DEV é uma ferramenta de navegador que permite aos desenvolvedores acessar facilmente o dump do processo em exibição na aplicação Fusion. Com um único clique, você será redirecionado para o dump do processo específico.
+# Fusion DEV Tool
+The Fusion DEV extension is a browser tool that allows developers to easily access the dump of the process being displayed in the Fusion application. With a single click, you will be redirected to the detailed dump of the specific process.
 
-## Tecnologias utilizadas
+## Technologies used
 - HTML
 - CSS
 - JavaScript
-  
-## Funcionalidades
-A extensão adiciona um botão "Dump Processo" ao seu navegador. Ao clicar nesse botão, a extensão identificará o processo em exibição na aplicação Fusion e abrirá uma nova guia com o dump detalhado desse processo.
 
-## Como utilizar
-1. Baixe os arquivos da extensão para o seu dispositivo.
-2. Abra o navegador Google Chrome.
-3. Na barra de URL, digite chrome://extensions e pressione Enter.
-4. Na página de extensões, ative o "Modo do desenvolvedor" no canto superior direito.
-5. Clique no botão "Carregar sem compactação" e selecione a pasta que contém os arquivos da extensão.
-6. Após carregar a extensão, um novo ícone será adicionado à barra de ferramentas do navegador.
-7. Acesse a aplicação Fusion.
-8. Quando estiver em uma página com um processo em exibição, o botão "Dump Processo" será visível na barra de ferramentas do navegador.
-9. Clique no botão "Dump Processo" para abrir uma nova guia com o dump detalhado do processo atual.
+## Features
+The extension adds a "Dump Process" button to your browser. When you click this button, the extension will identify the process being displayed in the Fusion application and open a new tab with the detailed dump of that process.
 
-## Contribuição
-Sinta-se à vontade para contribuir com melhorias, correções de bugs ou novas funcionalidades para esta extensão. Basta fazer um fork do repositório, realizar as alterações desejadas e enviar um pull request.
+## How to use
+1. Download the extension files to your device.
+2. Open the Google Chrome browser.
+3. In the URL bar, type chrome://extensions and press Enter.
+4. On the extensions page, enable "Developer mode" in the top right corner.
+5. Click the "Load unpacked" button and select the folder containing the extension files.
+6. After loading the extension, a new icon will be added to the browser toolbar.
+7. Access the Fusion application.
 
-## Autor
-Este projeto foi desenvolvido por Samoel Laureano. Você pode entrar em contato comigo através do meu perfil do GitHub: samoellaureano
+## Contribution
+Feel free to contribute improvements, bug fixes, or new features to this extension. Just fork the repository, make the desired changes, and submit a pull request.
 
-## Licença
-Este projeto está licenciado sob a MIT License.
+## Author
+This project was developed by Samoel Laureano. You can contact me through my GitHub profile: samoellaureano
+
+## License
+This project is licensed under the MIT License.
+
+## KeyMap
+Ctrl + Alt + 1 : Open the Central.jsp
+Ctrl + Alt + 2 : Open the FormTree.jsp
+Ctrl + Alt + 3 : Open the SQL.jsp
+Ctrl + Alt + 4 : Open the Script.jsp
+Ctrl + Alt + 5 : Open the Log.jsp
+Ctrl + Alt + 6 : Open the TomCatLog.jsp
