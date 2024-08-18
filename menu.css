@@ -1,4 +1,5 @@
 #divMenu {
+    opacity: 0;
     position: fixed;
     color: #fff;
     border: none;

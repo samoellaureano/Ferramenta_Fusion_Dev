@@ -96,7 +96,6 @@ function criaEventoKeyMap(listKeyObj) {
     });
 }
 
-
 function mostrarToast(mensagem) {
     var toast = document.createElement('div');
     toast.textContent = mensagem;
@@ -192,9 +191,12 @@ function createDivMenu() {
         document.getElementById('menu').classList.toggle('exibir');
         document.getElementById('titleMenu').classList.toggle('titleMenuRoteated');
     });
+
+    //exibir o menudepois de 1s
+    setTimeout(() => {
+        divMenu.style.opacity = 1;
+    }, 500);
 }
-
-
 
 // Função para salvar a lista de objetos keySave no localStorage, apenas se não existir
 function saveKeyListToLocalStage(keyList) {
@@ -402,6 +404,180 @@ function updateReportCSS() {
     }
 }
 
+function insertStyleMemReport() {
+    // Função para formatar bytes
+    function formatBytes(bytes) {
+        const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+        if (bytes === 0) return '0 Byte';
+        const i = parseInt(Math.floor(Math.log(bytes) / Math.log(1024)));
+        return Math.round(bytes / Math.pow(1024, i), 2) + ' ' + sizes[i];
+    }
+
+    // Função para criar a visualização de progresso
+    function createProgressBar(label, percentage, used, max, unit) {
+        return `
+            <div class="memory-container">
+                <div class="label">${label}</div>
+                <div class="progress-bar">
+                    <div class="progress" style="width: ${percentage}%; background-color: ${percentage > 80 ? '#ff5722' : '#4caf50'};">
+                        ${percentage.toFixed(2)}%
+                    </div>
+                </div>
+                <div>Used: ${formatBytes(used)} / Max: ${max !== -1 ? formatBytes(max) : 'N/A'}</div>
+            </div>
+            <br>
+        `;
+    }
+
+    // Função para gerar alertas de possíveis problemas
+    function generateAlerts(heapPercentage, nonHeapPercentage, edenPercentage, oldGenPercentage, survivorPercentage) {
+        let alerts = '';
+        if (heapPercentage > 80) {
+            alerts += '<div class="alert">Alert: Heap Memory Usage is above 80%!</div>';
+        }
+        if (nonHeapPercentage > 80) {
+            alerts += '<div class="alert">Alert: Non-Heap Memory Usage is above 80%!</div>';
+        }
+        if (edenPercentage > 80) {
+            alerts += '<div class="alert">Alert: G1 Eden Space Usage is above 80%!</div>';
+        }
+        if (oldGenPercentage > 80) {
+            alerts += '<div class="alert">Alert: G1 Old Gen Usage is above 80%!</div>';
+        }
+        if (survivorPercentage > 80) {
+            alerts += '<div class="alert">Alert: G1 Survivor Space Usage is above 80%!</div>';
+        }
+        return alerts;
+    }
+
+    // Extrair informações de uso de memória do texto
+    const bodyText = document.body.textContent;
+
+    const heapData = /Heap:.*used = (\d+).*committed = (\d+).*max = (\d+)/.exec(bodyText);
+    const nonHeapData = /Non-Heap:.*used = (\d+).*committed = (\d+)/.exec(bodyText);
+
+    const edenSpaceData = /G1 Eden Space:.*used = (\d+).*committed = (\d+).*max = (-?\d+)/.exec(bodyText);
+    const oldGenData = /G1 Old Gen:.*used = (\d+).*committed = (\d+).*max = (\d+)/.exec(bodyText);
+    const survivorSpaceData = /G1 Survivor Space:.*used = (\d+).*committed = (\d+).*max = (-?\d+)/.exec(bodyText);
+
+    const runtime = /Runtime: (\d+)/.exec(bodyText);
+    const threadCPU = /Thread CPU: (\d+)/.exec(bodyText);
+    const threadUser = /Thread User: (\d+)/.exec(bodyText);
+    const youngGen = /G1 Young Generation: (\d+).*\/ (\d+ms)/.exec(bodyText);
+    const oldGen = /G1 Old Generation: (\d+).*\/ (\d+ms)/.exec(bodyText);
+    const compilers = /Compilation: HotSpot 64-Bit Tiered Compilers: (\d+)/.exec(bodyText);
+
+    // Parse dos valores de memória
+    const heapUsed = parseInt(heapData[1]);
+    const heapMax = parseInt(heapData[3]);
+    const heapPercentage = (heapUsed / heapMax) * 100;
+
+    const nonHeapUsed = parseInt(nonHeapData[1]);
+    const nonHeapCommitted = parseInt(nonHeapData[2]);
+    const nonHeapPercentage = (nonHeapUsed / nonHeapCommitted) * 100;
+
+    const edenUsed = parseInt(edenSpaceData[1]);
+    const edenMax = parseInt(edenSpaceData[3]);
+    const edenPercentage = edenMax !== -1 ? (edenUsed / edenMax) * 100 : 0;
+
+    const oldGenUsed = parseInt(oldGenData[1]);
+    const oldGenMax = parseInt(oldGenData[3]);
+    const oldGenPercentage = (oldGenUsed / oldGenMax) * 100;
+
+    const survivorUsed = parseInt(survivorSpaceData[1]);
+    const survivorMax = parseInt(survivorSpaceData[3]);
+    const survivorPercentage = survivorMax !== -1 ? (survivorUsed / survivorMax) * 100 : 0;
+
+    // Gerar alertas
+    const alerts = generateAlerts(heapPercentage, nonHeapPercentage, edenPercentage, oldGenPercentage, survivorPercentage);
+
+    // Criar container para a visualização
+    const container = document.createElement('div');
+    container.style.padding = '20px';
+    container.style.fontFamily = 'Arial, sans-serif';
+    container.style.background = '#f9f9f9';
+    container.style.display = 'inline-block';
+    container.style.width = '-webkit-fill-available';
+    container.style.marginTop = '-19rem';
+
+    // HTML da visualização
+    container.innerHTML = `
+        ${createProgressBar('Heap Memory Usage', heapPercentage, heapUsed, heapMax, 'K')}
+        ${createProgressBar('Non-Heap Memory Usage', nonHeapPercentage, nonHeapUsed, nonHeapCommitted, 'K')}
+        ${createProgressBar('G1 Eden Space', edenPercentage, edenUsed, edenMax, 'K')}
+        ${createProgressBar('G1 Old Gen', oldGenPercentage, oldGenUsed, oldGenMax, 'K')}
+        ${createProgressBar('G1 Survivor Space', survivorPercentage, survivorUsed, survivorMax, 'K')}
+
+        <div class="metric-container">
+            <div class="label">Runtime: ${runtime[1]}</div>
+        </div>
+        <br>
+        <div class="metric-container">
+            <div class="label">Thread CPU Time: ${threadCPU[1]} ms</div>
+        </div>
+        <br>
+        <div class="metric-container">
+            <div class="label">Thread User Time: ${threadUser[1]} ms</div>
+        </div>
+        <br>
+        <div class="metric-container">
+            <div class="label">G1 Young Generation Time: ${youngGen[1]} / ${youngGen[2]}</div>
+        </div>
+        <br>
+        <div class="metric-container">
+            <div class="label">G1 Old Generation Time: ${oldGen[1]} / ${oldGen[2]}</div>
+        </div>
+        <br>
+        <div class="metric-container">
+            <div class="label">Compilation: ${compilers[1]} compilations</div>
+        </div>
+        <div class="alerts">
+            ${alerts}
+        </div>
+    `;
+
+    // Estilos CSS
+    const style = document.createElement('style');
+    style.innerHTML = `
+        .memory-container {
+            margin-bottom: 20px;
+        }
+        .label {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .progress-bar {
+            width: 100%;
+            background-color: #f3f3f3;
+            border-radius: 5px;
+            overflow: hidden;
+            margin-bottom: 10px;
+        }
+        .progress {
+            height: 30px;
+            text-align: center;
+            line-height: 30px;
+            color: white;
+            transition: width 0.3s;
+        }
+        .metric-container {
+            margin-bottom: 20px;
+        }
+        .alert {
+            padding: 10px;
+            background-color: #ff5722;
+            color: white;
+            margin-top: 10px;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+    `;
+
+    // Adicionar a visualização ao documento
+    document.head.appendChild(style);
+    document.body.appendChild(container);
+}
+
 function init() {
     setInterval(function () {
         toggleButtonVisibility();
@@ -419,6 +595,11 @@ function init() {
     var retrievedKeyList = getKeyListFromLocalStorage();
     // Atualizar a lista de objetos keySave no localStorage
     updateKeyListToLocalStorage(retrievedKeyList);
+
+    if (window.location.href.includes("adm/mem.jsp")) {
+        insertStyleMemReport();
+    }
+
 }
 
 init();

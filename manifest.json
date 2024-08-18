@@ -10,9 +10,6 @@
       "matches": [
         "*://*/fusion/*"
       ],
-      "exclude_matches": [
-        "*://*/fusion/adm/*"
-      ],
       "js": [
         "script.js"
       ],
