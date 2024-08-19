@@ -171,6 +171,13 @@ function createDivMenu() {
         divMenu.style.cursor = 'pointer';
     });
 
+    // Evento de clique para abrir e fechar o menu
+    divMenu.addEventListener('click', function () {
+        divMenu.classList.toggle('rotated');
+        document.getElementById('menu').classList.toggle('exibir');
+        document.getElementById('titleMenu').classList.toggle('titleMenuRoteated');
+    });
+
     //adicionar outro estilo para uma url diferente de /fusion/portal
     if (!urlBase.includes("/fusion/portal")) {
         // Obtém todas as <li> dentro do <ul> com ID "menu"
@@ -183,14 +190,6 @@ function createDivMenu() {
 
         document.getElementById('titleMenu').classList.add('titleMenuOutPortal');
     }
-
-    var titleMenu = document.getElementById('titleMenu');
-    titleMenu.addEventListener('click', function () {
-        // Alternar a classe com a animação
-        divMenu.classList.toggle('rotated');
-        document.getElementById('menu').classList.toggle('exibir');
-        document.getElementById('titleMenu').classList.toggle('titleMenuRoteated');
-    });
 
     //exibir o menudepois de 1s
     setTimeout(() => {
