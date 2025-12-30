@@ -580,9 +580,13 @@ function insertStyleMemReport() {
 
 function insertStyleLogs() {
     (function () {
-        // =============================================
-        // CONFIGURAÇÃO DE CORES (apenas fundo e texto)
-        // =============================================
+
+        const container = document.getElementById('tail_output');
+        const LOG_HEADER_REGEX = /^(\d{4}-\d{2}-\d{2}-\d{2}:\d{2}:\d{2}\.\d{3})\s+(ERROR|WARN|INFO|DEBUG)/;
+
+        if (!container) return;
+
+        /* ================= CONFIG ================= */
         const styles = {
             levels: {
                 ERROR: { bg: '#ffebee', color: '#c62828' },
@@ -590,235 +594,409 @@ function insertStyleLogs() {
                 INFO: { bg: '#e3f2fd', color: '#1976d2' },
                 DEBUG: { bg: '#f5f5f5', color: '#424242' }
             },
-            exception: { bg: '#ffebee', color: '#c62828' },
-            lucene: { bg: '#e8f5e8', color: '#2e7d32' },
             hover: '#e0e0e0',
             cardColors: {
-                Total: '#495057',
+                TOTAL: '#343a40',
                 ERROR: '#d32f2f',
                 WARN: '#f57c00',
                 INFO: '#1976d2',
-                DEBUG: '#424242',
-                Exceções: '#c62828',
-                'Queries Lucene': '#2e7d32'
+                DEBUG: '#424242'
             }
         };
 
-        let currentFilter = 'all';
+        let lastErrorTime = null;
+        let currentFilter = 'TOTAL';
 
-        // =============================================
-        // CRIA CONTAINER DE CARDS
-        // =============================================
+        const threadHeat = Object.create(null);
+        const errorPatterns = Object.create(null);
+        const errorDeltas = [];
+
+        let lastErrorText = '';
+
+        /* ================= ESTADO DE HERANÇA E CONTADORES ================= */
+        let lastTimestampLevel = null;   // nível do último log com timestamp
+        let lastTimestampThread = null;
+
+        const globalCounts = {
+            TOTAL: 0,
+            ERROR: 0,
+            WARN: 0,
+            INFO: 0,
+            DEBUG: 0
+        };
+
+        const isErrorContinuation = txt => /^(\s*at\s|Caused by:|java\.)/i.test(txt.trim());
+
+        /* ================= PROCESS LINE ================= */
+        function processLine(line) {
+            if (line.dataset.processed) return;
+            line.dataset.processed = '1';
+
+            globalCounts.TOTAL++; // conta TODAS as linhas
+
+            const rawText = line.textContent;
+            const trimmed = rawText.trim();
+            if (!trimmed) return;
+
+            const match = rawText.match(LOG_HEADER_REGEX);
+
+            let assignedLevel = null;
+
+            /* ===== LINHA SEM TIMESTAMP (continuação) ===== */
+            if (!match) {
+                let levelToUse = lastTimestampLevel;
+
+                // Detecção especial para linhas de resumo de JOB (sempre INFO)
+                if (/Total de processos iniciados|Tempo total/i.test(rawText)) {
+                    levelToUse = 'INFO';
+                }
+                // Stacktrace tem prioridade máxima
+                else if (isErrorContinuation(rawText)) {
+                    levelToUse = 'ERROR';
+                }
+
+                if (levelToUse) {
+                    line.dataset.level = levelToUse;
+                    line.dataset.thread = lastTimestampThread || '';
+
+                    line.style.backgroundColor = styles.levels[levelToUse].bg;
+                    line.style.color = styles.levels[levelToUse].color;
+                    line.style.paddingLeft = '22px';
+                    line.style.fontStyle = isErrorContinuation(rawText) ? 'normal' : 'italic';
+
+                    if (levelToUse === 'ERROR' && lastErrorText) {
+                        lastErrorText += '\n' + rawText;
+                    }
+
+                    // Contagem: apenas stacktrace conta como ERROR extra
+                    if (isErrorContinuation(rawText)) {
+                        globalCounts.ERROR++;
+                    }
+                } else {
+                    // Fallback neutro
+                    line.style.backgroundColor = '#ffffff';
+                    line.style.color = '#000000';
+                    line.style.paddingLeft = '22px';
+                    line.style.fontStyle = 'italic';
+                }
+                return;
+            }
+            /* ===== LINHA COM TIMESTAMP ===== */
+            else {
+                assignedLevel = match[2];
+                lastTimestampLevel = assignedLevel;
+
+                const tm = rawText.match(/\[(.*?)\]/);
+                if (tm) lastTimestampThread = tm[1];
+
+                if (assignedLevel === 'ERROR') {
+                    lastErrorText = rawText;
+                }
+
+                // Contagem correta por nível
+                globalCounts[assignedLevel]++;
+            }
+
+            // === APLICA ESTILOS (sempre, mesmo na última linha) ===
+            if (assignedLevel && styles.levels[assignedLevel]) {
+                line.dataset.level = assignedLevel;
+                line.dataset.thread = lastTimestampThread || '';
+
+                line.style.backgroundColor = styles.levels[assignedLevel].bg;
+                line.style.color = styles.levels[assignedLevel].color;
+                line.style.paddingLeft = '22px';
+                line.style.fontStyle = assignedLevel === 'ERROR' && isErrorContinuation(rawText) ? 'normal' : 'italic';
+            } else {
+                // Fallback para linhas órfãs
+                line.style.backgroundColor = '#ffffff';
+                line.style.color = '#000000';
+                line.style.paddingLeft = '22px';
+                line.style.fontStyle = 'italic';
+            }
+
+            // Badge de thread (só na linha com header)
+            if (match) {
+                const tm = rawText.match(/\[(.*?)\]/);
+                if (tm) {
+                    const badge = document.createElement('span');
+                    badge.textContent = tm[1];
+                    badge.style.cssText = `
+                        background:#b0b0b0;border-radius:6px;padding:2px 6px;
+                        margin-right:6px;font-size:11px;font-family:monospace;
+                    `;
+                    line.prepend(badge);
+                }
+
+                line.onclick = () => line.classList.toggle('pinned');
+
+                /* ===== ANALYTICS (só linhas com header ERROR) ===== */
+                if (assignedLevel === 'ERROR') {
+                    if (lastTimestampThread) {
+                        threadHeat[lastTimestampThread] = (threadHeat[lastTimestampThread] || 0) + 1;
+                    }
+
+                    const normalized = rawText.replace(/\d+/g, '#').slice(0, 160);
+                    errorPatterns[normalized] = (errorPatterns[normalized] || 0) + 1;
+
+                    const t = rawText.match(/(\d{2}):(\d{2}):(\d{2})/);
+                    if (t) {
+                        const seconds = (+t[1]) * 3600 + (+t[2]) * 60 + (+t[3]);
+                        if (lastErrorTime !== null) {
+                            const delta = seconds - lastErrorTime;
+                            if (delta >= 0) errorDeltas.push(delta);
+                        }
+                        lastErrorTime = seconds;
+                    }
+                }
+            }
+        }
+
+        /* ================= FILTRO (apenas visual) ================= */
+        function applyFilter() {
+            [...container.children].forEach(l => {
+                const level = l.dataset.level;
+                l.style.display = (currentFilter === 'TOTAL' || level === currentFilter) ? 'block' : 'none';
+            });
+        }
+
+        /* ================= CARDS (contagem fixa, total real) ================= */
         function createCardsContainer() {
             if (document.getElementById('log-stats-cards')) return;
-
-            const container = document.createElement('div');
-            container.id = 'log-stats-cards';
-            container.style.cssText = `
-            display: flex;
-            flex-wrap: wrap;
-            gap: 16px;
-            padding: 16px;
-            background: #f8f9fa;
-            border-bottom: 2px solid #dee2e6;
-            font-family: Arial, Helvetica, sans-serif;
-            margin-bottom: 12px;
-            justify-content: center;
-        `;
-
-            const headerTitle = document.getElementById('headerTitle');
-            if (headerTitle && headerTitle.parentElement) {
-                headerTitle.parentElement.parentElement.parentElement.after(container);
-            } else {
-                document.body.insertBefore(container, document.body.firstChild);
-            }
+            const c = document.createElement('div');
+            c.id = 'log-stats-cards';
+            c.style.cssText = `
+                position:sticky;top:0;z-index:9998;display:flex;gap:12px;padding:12px;
+                background:#f1f3f5;border-bottom:2px solid #dee2e6;
+            `;
+            container.before(c);
         }
 
-        // =============================================
-        // ATUALIZA OU CRIA UM CARD (com filtro)
-        // =============================================
-        function updateCard(title, count, color, filterType) {
-            let cardId = `card-${title.toLowerCase().replace(/\s+/g, '-')}`;
-            let card = document.getElementById(cardId);
-
+        function updateCard(title, count, color) {
+            let card = document.getElementById(`card-${title}`);
             if (!card) {
                 card = document.createElement('div');
-                card.id = cardId;
+                card.id = `card-${title}`;
                 card.style.cssText = `
-                background: white;
-                border-radius: 10px;
-                padding: 18px;
-                min-width: 150px;
-                text-align: center;
-                box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-                border-top: 6px solid ${color};
-                flex: 1;
-                cursor: pointer;
-                transition: all 0.3s ease;
-            `;
-                card.onmouseover = () => {
-                    if (currentFilter !== filterType) card.style.transform = 'translateY(-6px)';
-                };
-                card.onmouseout = () => {
-                    if (currentFilter !== filterType) card.style.transform = 'translateY(0)';
-                };
-
+                    flex:1;background:#fff;border-radius:10px;padding:16px;text-align:center;
+                    cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.1);border-top:6px solid ${color};
+                `;
                 card.onclick = () => {
-                    currentFilter = (currentFilter === filterType) ? 'all' : filterType;
-                    updateAll();
+                    currentFilter = currentFilter === title ? 'TOTAL' : title;
+                    applyFilter();
+                    renderDashboard();
                 };
-
                 card.innerHTML = `
-                <div class="card-count" style="font-size: 2.6em; font-weight: bold; color: ${color};">0</div>
-                <div style="margin-top: 10px; color: #555; font-size: 1em;">${title}</div>
-            `;
+                    <div class="count" style="font-size:2.2em;color:${color}">0</div>
+                    <div style="color:#555">${title}</div>
+                `;
                 document.getElementById('log-stats-cards').appendChild(card);
             }
+            card.querySelector('.count').textContent = count;
+        }
 
-            const countEl = card.querySelector('.card-count');
-            countEl.textContent = count.toLocaleString();
-            countEl.style.color = count > 0 ? color : '#aaa';
+        function updateCards() {
+            updateCard('TOTAL', globalCounts.TOTAL, styles.cardColors.TOTAL);
+            updateCard('ERROR', globalCounts.ERROR, styles.cardColors.ERROR);
+            updateCard('WARN', globalCounts.WARN, styles.cardColors.WARN);
+            updateCard('INFO', globalCounts.INFO, styles.cardColors.INFO);
+            updateCard('DEBUG', globalCounts.DEBUG, styles.cardColors.DEBUG);
+        }
 
-            if (currentFilter === filterType) {
-                card.style.transform = 'translateY(-6px)';
-                card.style.boxShadow = '0 8px 20px rgba(0,0,0,0.2)';
-                card.style.borderTopWidth = '8px';
+        /* ================= DASHBOARD (inalterado) ================= */
+        // ... (mesmo código do seu dashboard original, mantido igual)
+
+        let dash = null;
+        let lastRender = 0;
+
+        function renderDashboard() {
+    const now = Date.now();
+    if (now - lastRender < 500) return;
+    lastRender = now;
+
+    const totalErrors = Object.values(errorPatterns).reduce((a, b) => a + b, 0);
+    if (!totalErrors) {
+        if (dash) dash.style.display = 'none';
+        return;
+    }
+
+    let dominantError = null;
+    let dominantCount = 0;
+    let wrapperError = null;
+
+    for (const [msg, count] of Object.entries(errorPatterns)) {
+        if (/resteasy|exceptionhandler|failed to execute/i.test(msg)) {
+            if (!wrapperError || count > wrapperError[1]) wrapperError = [msg, count];
+            continue;
+        }
+        if (count > dominantCount) {
+            dominantError = [msg, count];
+            dominantCount = count;
+        }
+    }
+    const finalError = dominantError || wrapperError;
+
+    let worstThread = null;
+    let worstThreadCount = 0;
+    for (const [t, c] of Object.entries(threadHeat)) {
+        if (c > worstThreadCount) {
+            worstThread = t;
+            worstThreadCount = c;
+        }
+    }
+
+    const avgDelta = errorDeltas.length ? errorDeltas.reduce((a, b) => a + b, 0) / errorDeltas.length : null;
+
+    if (!dash) {
+        dash = document.createElement('div');
+        dash.id = 'fusion-dashboard';
+        dash.style.cssText = `
+            position:fixed;bottom:20px;right:20px;width:480px;z-index:9999;
+            background:#fff;border-radius:14px;box-shadow:0 12px 35px rgba(0,0,0,.25);
+            font-family:system-ui,monospace;font-size:13px;
+        `;
+        document.body.appendChild(dash);
+    }
+    dash.style.display = 'block';
+
+    let errorType = 'Indefinido';
+    let actionHint = 'Investigar stacktrace raiz';
+    let rootCause = 'Desconhecida';
+
+    if (finalError) {
+        const e = finalError[0].toLowerCase();
+        if (/lazy|null.*transaction|no session|hibernate|jpa/.test(e)) {
+            errorType = '🧩 Hibernate / Transação';
+            rootCause = 'Acesso a entidade fora de contexto transacional';
+            actionHint = 'Adicionar @Transactional, usar fetch join ou DTO.';
+        } else if (/resteasy|rest/.test(e)) {
+            errorType = '🌐 REST (Erro wrapper)';
+            rootCause = 'Exceção encapsulada';
+            actionHint = 'Localizar erro imediatamente anterior no log.';
+        } else if (/timeout|connection|socket|pool/.test(e)) {
+            errorType = '🌐 Infraestrutura';
+            rootCause = 'Instabilidade externa';
+            actionHint = 'Verificar banco, pool de conexões ou serviços.';
+        } else if (/permission|auth|security/.test(e)) {
+            errorType = '🔐 Segurança';
+            rootCause = 'Contexto inválido';
+            actionHint = 'Validar permissões e usuário autenticado.';
+        } else if (/nullpointer|illegalstate/.test(e)) {
+            errorType = '💥 Bug de código';
+            rootCause = 'Estado inválido da aplicação';
+            actionHint = 'Adicionar validações defensivas.';
+        } else if (/outofmemory|gc overhead/.test(e)) {
+            errorType = '🧠 Memória / Performance';
+            rootCause = 'Falta de recursos';
+            actionHint = 'Analisar heap e otimizar consultas ou cargas.';
+        } else if (/sqlsyntax|constraint|deadlock|jdbc/.test(e)) {
+            errorType = '🗄️ Banco de Dados';
+            rootCause = 'Erro em operação de banco';
+            actionHint = 'Revisar query SQL e integridade dos dados.';
+        } else {
+            errorType = '❓ Desconhecido';
+            rootCause = 'Causa não identificada';
+            actionHint = 'Analisar stacktrace e contexto da aplicação.';
+        }
+    }
+
+    const burst = avgDelta !== null && avgDelta < 10 ? '🔥 Explosão de erros'
+        : avgDelta !== null && avgDelta < 60 ? '⚠️ Frequentes' : '🟢 Esporádicos';
+
+    let risk = '🟢 Baixo';
+    if (totalErrors > 10 || (avgDelta !== null && avgDelta < 15)) risk = '🔴 Alto';
+    else if (totalErrors > 3 || (avgDelta !== null && avgDelta < 60)) risk = '🟠 Médio';
+
+    const flowConcentration = worstThreadCount / totalErrors > 0.6
+        ? 'Erro concentrado em um fluxo específico'
+        : 'Erro distribuído no sistema';
+
+    dash.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:#212529;color:#fff;border-radius:14px 14px 0 0;font-weight:600;">
+            <span>🧠 Fusion Error Intelligence</span>
+            <span style="cursor:pointer;font-size:16px" id="fusion-toggle-btn">➕</span>
+        </div>
+        <div class="body" style="padding:14px;line-height:1.6;display:none;">
+            <b>Status:</b> ${risk} &nbsp;|&nbsp; ${burst}<br>
+            <b>Tipo:</b> ${errorType}
+            <hr>
+            <b>🧠 Diagnóstico</b><br>
+            <b>Causa provável:</b> ${rootCause}<br>
+            <b>Impacto:</b> ${flowConcentration}
+            <hr>
+            <b>🔥 Erro dominante (${finalError ? finalError[1] : 0}x)</b>
+            <div style="margin-top:4px;background:#ffebee;color:#b71c1c;padding:6px 8px;border-radius:6px;font-size:12px;max-height:70px;overflow:auto;">
+                ${finalError ? finalError[0].replace(/#/g, '*') : '-'}
+            </div>
+            <div style="margin-top:8px">
+                <b>🧵 Thread crítica:</b> ${worstThread || '-'}<br>
+                <b>⏱️ MTBE médio:</b> ${avgDelta ? avgDelta.toFixed(1) + 's' : '-'}
+            </div>
+            <hr>
+            <b>🛠️ Próxima ação recomendada</b><br>
+            <span style="color:#2e7d32">${actionHint}</span>
+            <hr>
+            <b>📌 Último erro real</b>
+            <div style="margin-top:4px;font-size:12px;color:#c62828;max-height:80px;overflow:auto;">
+                ${lastErrorText || '-'}
+            </div>
+        </div>
+    `;
+
+    // Adiciona o evento de toggle apenas uma vez
+    const toggleBtn = dash.querySelector('#fusion-toggle-btn');
+    if (toggleBtn && !toggleBtn.dataset.listenerAdded) {
+        toggleBtn.dataset.listenerAdded = 'true';
+        toggleBtn.onclick = function () {
+            const body = dash.querySelector('.body');
+            if (body.style.display === 'none') {
+                body.style.display = 'block';
+                this.textContent = '➖';
             } else {
-                card.style.transform = 'translateY(0)';
-                card.style.boxShadow = '0 4px 12px rgba(0,0,0,0.1)';
-                card.style.borderTopWidth = '6px';
+                body.style.display = 'none';
+                this.textContent = '➕';
             }
-        }
+        };
+    }
+}
 
-        // =============================================
-        // APLICA APENAS CORES (sem bordas, sombras, fontes, etc.)
-        // =============================================
-        function applySimpleColors(container) {
-            const lines = container.querySelectorAll('div');
-
-            lines.forEach(line => {
-                const text = line.textContent.trim();
-
-                // Oculta linhas completamente vazias
-                if (text === '') {
-                    line.style.display = 'none';
-                    return;
-                }
-
-                // Decide se deve mostrar com base no filtro atual
-                let shouldShow = true;
-                if (currentFilter !== 'all') {
-                    switch (currentFilter) {
-                        case 'error': shouldShow = /ERROR/.test(text); break;
-                        case 'warn': shouldShow = /WARN/.test(text); break;
-                        case 'info': shouldShow = /INFO/.test(text); break;
-                        case 'debug': shouldShow = /DEBUG/.test(text); break;
-                        case 'exception': shouldShow = text.includes('Exception') || text.includes('NullPointerException'); break;
-                        case 'lucene': shouldShow = text.includes('Lucene query:'); break;
-                    }
-                }
-
-                line.style.display = shouldShow ? 'block' : 'none';
-
-                if (shouldShow) {
-                    // Reseta tudo para o estilo original
-                    line.style.cssText = '';
-
-                    // Aplica apenas cor de fundo e texto de acordo com o tipo
-                    const levelMatch = text.match(/^\d{4}-\d{2}-\d{2}-\d{2}:\d{2}:\d{2}\.\d{3} (ERROR|WARN|INFO|DEBUG)/);
-                    if (levelMatch) {
-                        const level = levelMatch[1];
-                        const cfg = styles.levels[level];
-                        line.style.backgroundColor = cfg.bg;
-                        line.style.color = cfg.color;
-                    } else if (text.includes('Exception') || text.includes('NullPointerException')) {
-                        line.style.backgroundColor = styles.exception.bg;
-                        line.style.color = styles.exception.color;
-                    } else if (text.includes('Lucene query:')) {
-                        line.style.backgroundColor = styles.lucene.bg;
-                        line.style.color = styles.lucene.color;
-                    }
-                }
-            });
-        }
-
-        // =============================================
-        // ATUALIZA ESTATÍSTICAS + CORES SIMPLES
-        // =============================================
+        /* ================= UPDATE ================= */
         function updateAll() {
-            const container = document.getElementById('tail_output');
-            if (!container) return;
-
+            // Reseta contadores
+            lastErrorTime = null;
+            currentFilter = 'TOTAL';
+            Object.keys(globalCounts).forEach(k => globalCounts[k] = 0);
+            Object.keys(threadHeat).forEach(k => delete threadHeat[k]);
+            Object.keys(errorPatterns).forEach(k => delete errorPatterns[k]);
+            errorDeltas.length = 0;
+            lastErrorText = '';
+            lastTimestampLevel = null;
+            lastTimestampThread = null;
+            
             createCardsContainer();
 
-            const allLines = container.querySelectorAll('div');
-            let visibleLines = 0;
-            let counts = { ERROR: 0, WARN: 0, INFO: 0, DEBUG: 0, EXCEPTION: 0, LUCENE: 0 };
+            // Processa todas as linhas (garante que a última seja colorida)
+            [...container.children].forEach(processLine);
 
-            allLines.forEach(line => {
-                const text = line.textContent.trim();
-                if (text === '') return;
-
-                visibleLines++;
-
-                if (/ERROR/.test(text)) counts.ERROR++;
-                if (/WARN/.test(text)) counts.WARN++;
-                if (/INFO/.test(text)) counts.INFO++;
-                if (/DEBUG/.test(text)) counts.DEBUG++;
-                if (text.includes('Exception') || text.includes('NullPointerException')) counts.EXCEPTION++;
-                if (text.includes('Lucene query:')) counts.LUCENE++;
-            });
-
-            updateCard('Total', visibleLines, styles.cardColors.Total, 'all');
-            updateCard('ERROR', counts.ERROR, styles.cardColors.ERROR, 'error');
-            updateCard('WARN', counts.WARN, styles.cardColors.WARN, 'warn');
-            updateCard('INFO', counts.INFO, styles.cardColors.INFO, 'info');
-            updateCard('DEBUG', counts.DEBUG, styles.cardColors.DEBUG, 'debug');
-            updateCard('Exceções', counts.EXCEPTION, styles.cardColors.Exceções, 'exception');
-            updateCard('Queries Lucene', counts.LUCENE, styles.cardColors['Queries Lucene'], 'lucene');
-
-            applySimpleColors(container);
+            updateCards();
+            applyFilter();
+            renderDashboard();
         }
 
-        // =============================================
-        // CSS MÍNIMO (apenas hover sutil)
-        // =============================================
-        if (!document.getElementById('minimal-log-viewer-css')) {
+        new MutationObserver(updateAll).observe(container, { childList: true });
+
+        if (!document.getElementById('fusion-log-css')) {
             const css = document.createElement('style');
-            css.id = 'minimal-log-viewer-css';
+            css.id = 'fusion-log-css';
             css.textContent = `
-            #tail_output div {
-                transition: background-color 0.2s ease;
-                padding: 2px 0;
-            }
-            #tail_output div:hover {
-                background-color: ${styles.hover} !important;
-            }
-        `;
+                #tail_output div:hover {background:${styles.hover}!important;}
+                .pinned {border-left:4px solid red!important;}
+            `;
             document.head.appendChild(css);
         }
 
-        // =============================================
-        // INTEGRAÇÃO COM loadTail E MUTAÇÕES
-        // =============================================
-        const originalLoadTail = window.loadTail;
-        if (originalLoadTail) {
-            window.loadTail = function () {
-                originalLoadTail.apply(this, arguments);
-                setTimeout(updateAll, 200);
-            };
-        }
-
-        const observer = new MutationObserver(updateAll);
-        const tailOutput = document.getElementById('tail_output');
-        if (tailOutput) {
-            observer.observe(tailOutput, { childList: true, subtree: true });
-        }
-
-        // Execução inicial
         updateAll();
+        console.log('%cFusion Log Analyzer PRO v9 - Última linha colorida + contagem corrigida', 'color:#2e7d32;font-size:16px;font-weight:bold');
 
-        console.log('%cLog Viewer SIMPLES ativado: apenas cores suaves + filtros + cards + linhas vazias ocultas.', 'color: #1976d2; font-size: 1.3em;');
     })();
 }
 
