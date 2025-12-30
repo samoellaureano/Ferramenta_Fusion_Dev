@@ -1,4 +1,5 @@
 var sonicAdded = false;
+var scrollOriginal = true;
 const urlBase = window.location.origin + window.location.pathname;
 const urlSemFusion = urlBase.replace(/\/fusion\/.*$/, '/fusion/');
 
@@ -577,12 +578,339 @@ function insertStyleMemReport() {
     document.body.appendChild(container);
 }
 
+function insertStyleLogs() {
+    (function () {
+        // =============================================
+        // CONFIGURAÇÃO DE CORES (apenas fundo e texto)
+        // =============================================
+        const styles = {
+            levels: {
+                ERROR: { bg: '#ffebee', color: '#c62828' },
+                WARN: { bg: '#fff3e0', color: '#ef6c00' },
+                INFO: { bg: '#e3f2fd', color: '#1976d2' },
+                DEBUG: { bg: '#f5f5f5', color: '#424242' }
+            },
+            exception: { bg: '#ffebee', color: '#c62828' },
+            lucene: { bg: '#e8f5e8', color: '#2e7d32' },
+            hover: '#e0e0e0',
+            cardColors: {
+                Total: '#495057',
+                ERROR: '#d32f2f',
+                WARN: '#f57c00',
+                INFO: '#1976d2',
+                DEBUG: '#424242',
+                Exceções: '#c62828',
+                'Queries Lucene': '#2e7d32'
+            }
+        };
+
+        let currentFilter = 'all';
+
+        // =============================================
+        // CRIA CONTAINER DE CARDS
+        // =============================================
+        function createCardsContainer() {
+            if (document.getElementById('log-stats-cards')) return;
+
+            const container = document.createElement('div');
+            container.id = 'log-stats-cards';
+            container.style.cssText = `
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+            padding: 16px;
+            background: #f8f9fa;
+            border-bottom: 2px solid #dee2e6;
+            font-family: Arial, Helvetica, sans-serif;
+            margin-bottom: 12px;
+            justify-content: center;
+        `;
+
+            const headerTitle = document.getElementById('headerTitle');
+            if (headerTitle && headerTitle.parentElement) {
+                headerTitle.parentElement.parentElement.parentElement.after(container);
+            } else {
+                document.body.insertBefore(container, document.body.firstChild);
+            }
+        }
+
+        // =============================================
+        // ATUALIZA OU CRIA UM CARD (com filtro)
+        // =============================================
+        function updateCard(title, count, color, filterType) {
+            let cardId = `card-${title.toLowerCase().replace(/\s+/g, '-')}`;
+            let card = document.getElementById(cardId);
+
+            if (!card) {
+                card = document.createElement('div');
+                card.id = cardId;
+                card.style.cssText = `
+                background: white;
+                border-radius: 10px;
+                padding: 18px;
+                min-width: 150px;
+                text-align: center;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+                border-top: 6px solid ${color};
+                flex: 1;
+                cursor: pointer;
+                transition: all 0.3s ease;
+            `;
+                card.onmouseover = () => {
+                    if (currentFilter !== filterType) card.style.transform = 'translateY(-6px)';
+                };
+                card.onmouseout = () => {
+                    if (currentFilter !== filterType) card.style.transform = 'translateY(0)';
+                };
+
+                card.onclick = () => {
+                    currentFilter = (currentFilter === filterType) ? 'all' : filterType;
+                    updateAll();
+                };
+
+                card.innerHTML = `
+                <div class="card-count" style="font-size: 2.6em; font-weight: bold; color: ${color};">0</div>
+                <div style="margin-top: 10px; color: #555; font-size: 1em;">${title}</div>
+            `;
+                document.getElementById('log-stats-cards').appendChild(card);
+            }
+
+            const countEl = card.querySelector('.card-count');
+            countEl.textContent = count.toLocaleString();
+            countEl.style.color = count > 0 ? color : '#aaa';
+
+            if (currentFilter === filterType) {
+                card.style.transform = 'translateY(-6px)';
+                card.style.boxShadow = '0 8px 20px rgba(0,0,0,0.2)';
+                card.style.borderTopWidth = '8px';
+            } else {
+                card.style.transform = 'translateY(0)';
+                card.style.boxShadow = '0 4px 12px rgba(0,0,0,0.1)';
+                card.style.borderTopWidth = '6px';
+            }
+        }
+
+        // =============================================
+        // APLICA APENAS CORES (sem bordas, sombras, fontes, etc.)
+        // =============================================
+        function applySimpleColors(container) {
+            const lines = container.querySelectorAll('div');
+
+            lines.forEach(line => {
+                const text = line.textContent.trim();
+
+                // Oculta linhas completamente vazias
+                if (text === '') {
+                    line.style.display = 'none';
+                    return;
+                }
+
+                // Decide se deve mostrar com base no filtro atual
+                let shouldShow = true;
+                if (currentFilter !== 'all') {
+                    switch (currentFilter) {
+                        case 'error': shouldShow = /ERROR/.test(text); break;
+                        case 'warn': shouldShow = /WARN/.test(text); break;
+                        case 'info': shouldShow = /INFO/.test(text); break;
+                        case 'debug': shouldShow = /DEBUG/.test(text); break;
+                        case 'exception': shouldShow = text.includes('Exception') || text.includes('NullPointerException'); break;
+                        case 'lucene': shouldShow = text.includes('Lucene query:'); break;
+                    }
+                }
+
+                line.style.display = shouldShow ? 'block' : 'none';
+
+                if (shouldShow) {
+                    // Reseta tudo para o estilo original
+                    line.style.cssText = '';
+
+                    // Aplica apenas cor de fundo e texto de acordo com o tipo
+                    const levelMatch = text.match(/^\d{4}-\d{2}-\d{2}-\d{2}:\d{2}:\d{2}\.\d{3} (ERROR|WARN|INFO|DEBUG)/);
+                    if (levelMatch) {
+                        const level = levelMatch[1];
+                        const cfg = styles.levels[level];
+                        line.style.backgroundColor = cfg.bg;
+                        line.style.color = cfg.color;
+                    } else if (text.includes('Exception') || text.includes('NullPointerException')) {
+                        line.style.backgroundColor = styles.exception.bg;
+                        line.style.color = styles.exception.color;
+                    } else if (text.includes('Lucene query:')) {
+                        line.style.backgroundColor = styles.lucene.bg;
+                        line.style.color = styles.lucene.color;
+                    }
+                }
+            });
+        }
+
+        // =============================================
+        // ATUALIZA ESTATÍSTICAS + CORES SIMPLES
+        // =============================================
+        function updateAll() {
+            const container = document.getElementById('tail_output');
+            if (!container) return;
+
+            createCardsContainer();
+
+            const allLines = container.querySelectorAll('div');
+            let visibleLines = 0;
+            let counts = { ERROR: 0, WARN: 0, INFO: 0, DEBUG: 0, EXCEPTION: 0, LUCENE: 0 };
+
+            allLines.forEach(line => {
+                const text = line.textContent.trim();
+                if (text === '') return;
+
+                visibleLines++;
+
+                if (/ERROR/.test(text)) counts.ERROR++;
+                if (/WARN/.test(text)) counts.WARN++;
+                if (/INFO/.test(text)) counts.INFO++;
+                if (/DEBUG/.test(text)) counts.DEBUG++;
+                if (text.includes('Exception') || text.includes('NullPointerException')) counts.EXCEPTION++;
+                if (text.includes('Lucene query:')) counts.LUCENE++;
+            });
+
+            updateCard('Total', visibleLines, styles.cardColors.Total, 'all');
+            updateCard('ERROR', counts.ERROR, styles.cardColors.ERROR, 'error');
+            updateCard('WARN', counts.WARN, styles.cardColors.WARN, 'warn');
+            updateCard('INFO', counts.INFO, styles.cardColors.INFO, 'info');
+            updateCard('DEBUG', counts.DEBUG, styles.cardColors.DEBUG, 'debug');
+            updateCard('Exceções', counts.EXCEPTION, styles.cardColors.Exceções, 'exception');
+            updateCard('Queries Lucene', counts.LUCENE, styles.cardColors['Queries Lucene'], 'lucene');
+
+            applySimpleColors(container);
+        }
+
+        // =============================================
+        // CSS MÍNIMO (apenas hover sutil)
+        // =============================================
+        if (!document.getElementById('minimal-log-viewer-css')) {
+            const css = document.createElement('style');
+            css.id = 'minimal-log-viewer-css';
+            css.textContent = `
+            #tail_output div {
+                transition: background-color 0.2s ease;
+                padding: 2px 0;
+            }
+            #tail_output div:hover {
+                background-color: ${styles.hover} !important;
+            }
+        `;
+            document.head.appendChild(css);
+        }
+
+        // =============================================
+        // INTEGRAÇÃO COM loadTail E MUTAÇÕES
+        // =============================================
+        const originalLoadTail = window.loadTail;
+        if (originalLoadTail) {
+            window.loadTail = function () {
+                originalLoadTail.apply(this, arguments);
+                setTimeout(updateAll, 200);
+            };
+        }
+
+        const observer = new MutationObserver(updateAll);
+        const tailOutput = document.getElementById('tail_output');
+        if (tailOutput) {
+            observer.observe(tailOutput, { childList: true, subtree: true });
+        }
+
+        // Execução inicial
+        updateAll();
+
+        console.log('%cLog Viewer SIMPLES ativado: apenas cores suaves + filtros + cards + linhas vazias ocultas.', 'color: #1976d2; font-size: 1.3em;');
+    })();
+}
+
+function alteraOAlinhamentoParaVisualizacaoDeCamposNaModelagem() {
+    let div = document.querySelector('.x-window-body');
+    if (div) {
+
+        let tbody = document.getElementById("tbodyFieldTable");
+
+        let cells = tbody.getElementsByTagName("td");
+
+        for (let cell of cells) {
+            cell.style.textAlign = "right";
+        }
+
+        if (scrollOriginal) {
+            div.querySelectorAll('div')[7].scrollLeft = div.querySelectorAll('div')[7].scrollWidth;
+            if (div.querySelectorAll('div')[7].scrollLeft > 0) {
+                scrollOriginal = false;
+            }
+        }
+    } else {
+        scrollOriginal = true;
+    }
+}
+
+function botaoAtualizarFrame() {
+    try {
+        if (window.top.document.getElementById("onlyCol").contentWindow.document.getElementById("iframe_task").contentWindow.document.getElementById("btnAtualizarFrame")) {
+            return;
+        }
+        const li = document.createElement('li');
+        li.style.listStyleType = 'none';
+        li.style.margin = '0.rem';
+        li.style.height = '2.07rem';
+        li.style.cursor = 'pointer';
+        li.style.display = 'inline-block';
+        li.id = 'btnAtualizarFrame';
+
+        const a = document.createElement('a');
+        a.innerText = 'Atualizar';
+        a.style.backgroundColor = 'rgb(240 240 240)';
+        a.style.color = 'rgb(104 116 136)';
+        a.style.padding = '6px 12px';
+        a.style.textDecoration = 'none';
+        a.style.display = 'flex';
+        a.style.alignItems = 'center';
+
+        a.addEventListener('mouseover', function () {
+            a.style.backgroundColor = '#5a7cad';
+            a.style.color = '#fff';
+        });
+
+        a.addEventListener('mouseout', function () {
+            a.style.backgroundColor = 'rgb(240 240 240)';
+            a.style.color = 'rgb(104 116 136)';
+        });
+
+
+        a.addEventListener('click', function () {
+            try {
+                window.top.document.getElementById("onlyCol").contentWindow
+                    .document.getElementById("iframe_task").contentWindow.location.reload();
+            } catch (error) {
+                console.error("Erro ao recarregar o iframe:", error);
+            }
+        });
+
+
+        li.appendChild(a);
+
+
+        if (window.top.document.getElementById("onlyCol")) {
+            var targetElement = window.top.document.getElementById("onlyCol").contentWindow.document.getElementById("iframe_task").contentWindow.document.querySelector('.dropdown_actions.pullRight');
+            if (targetElement) {
+                targetElement.parentNode.insertBefore(li, targetElement);
+            }
+        }
+    } catch (error) {
+
+    }
+}
+
+
 function init() {
     setInterval(function () {
         toggleButtonVisibility();
         criaEventoCopy();
         updateReportCSS();
         addSonicComponent();
+        alteraOAlinhamentoParaVisualizacaoDeCamposNaModelagem();
+        botaoAtualizarFrame();
     }, 500);
 
     createDivMenu();
@@ -597,8 +925,9 @@ function init() {
 
     if (window.location.href.includes("adm/mem.jsp")) {
         insertStyleMemReport();
+    } else if (window.location.href.includes("adm/tomcatLog.jsp")) {
+        insertStyleLogs();
     }
-
 }
 
 init();
