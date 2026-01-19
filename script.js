@@ -581,6 +581,237 @@
                 DEBUG: 0
             };
 
+            const highlightPresets = [
+                {id: 'amber', label: 'Amarelo / Marrom', bg: '#ffeb3b', color: '#3e2723'},
+                {id: 'cyan', label: 'Ciano / Verde Escuro', bg: '#00bcd4', color: '#fff'},
+                {id: 'mage', label: 'Rosa / Roxo', bg: '#e91e63', color: '#fff'},
+                {id: 'lime', label: 'Lima / Verde', bg: '#8bc34a', color: '#fff'}
+            ];
+            const highlightStorageKey = 'fusion-log-highlights-list';
+            const highlightHistoryKey = 'fusion-log-highlights-history';
+            const highlightClass = 'fusion-highlight';
+            const getPresetById = id => highlightPresets.find(p => p.id === id) || highlightPresets[0];
+
+            const loadHighlights = () => {
+                try {
+                    const saved = localStorage.getItem(highlightStorageKey);
+                    if (saved) {
+                        const parsed = JSON.parse(saved);
+                        if (Array.isArray(parsed)) {
+                            return parsed;
+                        }
+                    }
+                } catch (err) {
+                    // ignorar falhas no storage
+                }
+                return [];
+            };
+
+            const loadHighlightsHistory = () => {
+                try {
+                    const saved = localStorage.getItem(highlightHistoryKey);
+                    if (saved) {
+                        const parsed = JSON.parse(saved);
+                        if (Array.isArray(parsed)) {
+                            return parsed;
+                        }
+                    }
+                } catch (err) {
+                    // ignorar falhas no storage
+                }
+                return [];
+            };
+
+            let highlightsList = loadHighlights();
+            let highlightsHistory = loadHighlightsHistory();
+            let highlightInputEl;
+            let highlightPresetEl;
+            let highlightListEl;
+            let highlightHistoryDropdownEl;
+
+            const persistHighlights = () => {
+                try {
+                    localStorage.setItem(highlightStorageKey, JSON.stringify(highlightsList));
+                } catch (err) {
+                    // ignorar
+                }
+            };
+
+            const persistHighlightsHistory = () => {
+                try {
+                    localStorage.setItem(highlightHistoryKey, JSON.stringify(highlightsHistory));
+                } catch (err) {
+                    // ignorar
+                }
+            };
+
+            const addToHistory = (phrase) => {
+                if (!phrase.trim()) return;
+                const index = highlightsHistory.indexOf(phrase);
+                if (index > -1) {
+                    highlightsHistory.splice(index, 1);
+                }
+                highlightsHistory.unshift(phrase);
+                if (highlightsHistory.length > 20) {
+                    highlightsHistory = highlightsHistory.slice(0, 20);
+                }
+                persistHighlightsHistory();
+            };
+
+            const renderHistoryDropdown = () => {
+                if (!highlightHistoryDropdownEl) return;
+                highlightHistoryDropdownEl.innerHTML = '';
+                if (highlightsHistory.length === 0) {
+                    highlightHistoryDropdownEl.innerHTML = '<div style="color:#999;font-size:11px;padding:8px 12px;text-align:center;">Histórico vazio</div>';
+                    return;
+                }
+                highlightsHistory.forEach((phrase, idx) => {
+                    const item = document.createElement('div');
+                    item.style.cssText = `
+                        display:flex;align-items:center;gap:8px;padding:8px 12px;
+                        background:#fff;border-bottom:1px solid #eee;cursor:pointer;
+                        transition:background 0.2s ease;
+                    `;
+                    item.onmouseover = () => item.style.background = '#f5f5f5';
+                    item.onmouseout = () => item.style.background = '#fff';
+                    item.innerHTML = `
+                        <span style="flex:1;font-size:12px;color:#333;word-break:break-all;">
+                            ${phrase}
+                        </span>
+                        <button data-idx="${idx}" class="remove-history" style="
+                            background:none;border:none;color:#999;cursor:pointer;
+                            font-size:14px;padding:0;line-height:1;
+                        ">✕</button>
+                    `;
+                    item.onclick = (e) => {
+                        if (!e.target.classList.contains('remove-history')) {
+                            highlightInputEl.value = phrase;
+                            highlightInputEl.focus();
+                            highlightHistoryDropdownEl.style.display = 'none';
+                        }
+                    };
+                    item.querySelector('.remove-history').addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        highlightsHistory.splice(idx, 1);
+                        persistHighlightsHistory();
+                        renderHistoryDropdown();
+                    });
+                    highlightHistoryDropdownEl.appendChild(item);
+                });
+                
+                const clearBtn = document.createElement('div');
+                clearBtn.style.cssText = `
+                    padding:8px 12px;background:#fafafa;border-top:1px solid #eee;
+                    text-align:center;cursor:pointer;transition:background 0.2s ease;
+                    font-size:11px;color:#d32f2f;font-weight:600;
+                `;
+                clearBtn.textContent = '🗑️ Limpar histórico';
+                clearBtn.onmouseover = () => clearBtn.style.background = '#f0f0f0';
+                clearBtn.onmouseout = () => clearBtn.style.background = '#fafafa';
+                clearBtn.onclick = () => {
+                    if (confirm('Tem certeza que deseja remover todo o histórico de highlights?')) {
+                        highlightsHistory = [];
+                        persistHighlightsHistory();
+                        renderHistoryDropdown();
+                    }
+                };
+                highlightHistoryDropdownEl.appendChild(clearBtn);
+            };
+
+            const cleanHighlightSpans = (line) => {
+                line.querySelectorAll(`.${highlightClass}`).forEach(span => {
+                    span.replaceWith(document.createTextNode(span.textContent));
+                });
+            };
+
+            const highlightNode = (node, phraseLower, length, preset) => {
+                if (node.nodeType === Node.TEXT_NODE) {
+                    const text = node.textContent;
+                    const lower = text.toLowerCase();
+                    const idx = lower.indexOf(phraseLower);
+                    if (idx >= 0) {
+                        const matched = node.splitText(idx);
+                        const rest = matched.splitText(length);
+                        const span = document.createElement('span');
+                        span.className = highlightClass;
+                        span.textContent = matched.textContent;
+                        span.style.backgroundColor = preset.bg;
+                        span.style.color = preset.color;
+                        span.style.borderRadius = '3px';
+                        span.style.padding = '0 2px';
+                        span.style.fontWeight = '600';
+                        matched.parentNode.replaceChild(span, matched);
+                        highlightNode(rest, phraseLower, length, preset);
+                    }
+                } else if (node.nodeType === 1) {
+                    if (node.classList && node.classList.contains(highlightClass)) return;
+                    [...node.childNodes].forEach(child => highlightNode(child, phraseLower, length, preset));
+                }
+            };
+
+            const applyHighlightsToLine = (line) => {
+                cleanHighlightSpans(line);
+                highlightsList.forEach(hl => {
+                    const rawPhrase = (hl.phrase || '').trim();
+                    if (!rawPhrase) return;
+                    const phraseLower = rawPhrase.toLowerCase();
+                    if (!line.textContent.toLowerCase().includes(phraseLower)) return;
+                    const preset = getPresetById(hl.presetId);
+                    highlightNode(line, phraseLower, rawPhrase.length, preset);
+                });
+            };
+
+            const applyHighlightsToAllLines = () => {
+                [...container.children].forEach(applyHighlightsToLine);
+            };
+
+            const renderHighlightsList = () => {
+                if (!highlightListEl) return;
+                highlightListEl.innerHTML = '';
+                if (highlightsList.length === 0) {
+                    highlightListEl.innerHTML = '<div style="color:#999;font-size:11px;padding:8px 12px;text-align:center;">Nenhum highlight adicionado</div>';
+                    return;
+                }
+                highlightsList.forEach((hl, idx) => {
+                    const preset = getPresetById(hl.presetId);
+                    const item = document.createElement('div');
+                    item.style.cssText = `
+                        display:flex;align-items:center;gap:8px;padding:8px 12px;
+                        background:${preset.bg};border-bottom:1px solid #eee;
+                        border-radius:0;margin:0;
+                    `;
+                    item.innerHTML = `
+                        <span style="flex:1;color:${preset.color};font-weight:600;font-size:12px;word-break:break-all;">
+                            ${hl.phrase}
+                        </span>
+                        <button data-idx="${idx}" class="remove-highlight" style="
+                            background:none;border:none;color:${preset.color};cursor:pointer;
+                            font-size:16px;padding:0;line-height:1;
+                        ">🗑️</button>
+                    `;
+                    item.querySelector('.remove-highlight').addEventListener('click', () => {
+                        highlightsList.splice(idx, 1);
+                        persistHighlights();
+                        renderHighlightsList();
+                        applyHighlightsToAllLines();
+                    });
+                    highlightListEl.appendChild(item);
+                });
+            };
+
+            const addHighlight = () => {
+                if (!highlightInputEl || !highlightPresetEl) return;
+                const phrase = highlightInputEl.value.trim();
+                if (!phrase) return;
+                const presetId = highlightPresetEl.value;
+                highlightsList.push({phrase, presetId});
+                addToHistory(phrase);
+                persistHighlights();
+                highlightInputEl.value = '';
+                renderHighlightsList();
+                applyHighlightsToAllLines();
+            };
+
             const isErrorContinuation = txt => /^(\s*at\s|Caused by:|java\.)/i.test(txt.trim());
 
             /* ================= PROCESS LINE ================= */
@@ -683,8 +914,6 @@
                         line.prepend(badge);
                     }
 
-                    line.onclick = () => line.classList.toggle('pinned');
-
                     /* ===== ANALYTICS (só linhas com header ERROR) ===== */
                     if (assignedLevel === 'ERROR') {
                         if (lastTimestampThread) {
@@ -721,10 +950,86 @@
                 const c = document.createElement('div');
                 c.id = 'log-stats-cards';
                 c.style.cssText = `
-                position:sticky;top:0;z-index:9998;display:flex;gap:12px;padding:12px;
+                position:sticky;top:0;z-index:9998;display:flex;flex-direction:column;gap:0;padding:0;
                 background:#f1f3f5;border-bottom:2px solid #dee2e6;
             `;
                 container.before(c);
+                console.log('%cFusion Cards Container criado', 'color:#1976d2;font-weight:bold');
+                
+                const cardsRow = document.createElement('div');
+                cardsRow.id = 'log-stats-cards-row';
+                cardsRow.style.cssText = `
+                display:flex;gap:12px;padding:12px;background:#f1f3f5;
+            `;
+                c.appendChild(cardsRow);
+                
+                createHighlightControls(c);
+            }
+
+            function createHighlightControls(parent) {
+                if (document.getElementById('log-highlight-controls')) return;
+                const wrapper = document.createElement('div');
+                wrapper.id = 'log-highlight-controls';
+                wrapper.innerHTML = `
+                    <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:#f9f9f9;border-bottom:1px solid #ddd;font-weight:600;font-size:13px;color:#333;border-top:1px solid #ddd;">
+                        ✨ Destacar Texto nos Logs
+                    </div>
+                    <div class="controls" style="display:flex;gap:8px;align-items:flex-start;padding:8px 12px;background:#f9f9f9;border-bottom:1px solid #ddd;">
+                        <div style="position:relative;flex:1;min-width:180px;">
+                            <input id="fusion-highlight-text" type="text" placeholder="Digite a frase para destacar (clique para histórico)" autocomplete="off">
+                            <div id="fusion-highlight-history" style="
+                                position:absolute;top:100%;left:0;width:100%;
+                                background:#fff;border:1px solid #c4c4c4;border-top:none;
+                                border-radius:0 0 6px 6px;max-height:200px;overflow-y:auto;
+                                display:none;z-index:10;box-shadow:0 4px 8px rgba(0,0,0,.1);
+                            "></div>
+                        </div>
+                        <select id="fusion-highlight-preset" aria-label="Paleta de destaque"></select>
+                        <button id="fusion-highlight-add">Adicionar</button>
+                        <button id="fusion-highlight-clear-all" class="ghost" title="Limpar todos os highlights">🗑️</button>
+                    </div>
+                    <div id="fusion-highlight-list" style="max-height:150px;overflow-y:auto;"></div>
+                `;
+                parent.appendChild(wrapper);
+                console.log('%cFusion Highlights Panel criado', 'color:#2e7d32;font-weight:bold');
+                highlightInputEl = wrapper.querySelector('#fusion-highlight-text');
+                highlightPresetEl = wrapper.querySelector('#fusion-highlight-preset');
+                highlightListEl = wrapper.querySelector('#fusion-highlight-list');
+                highlightHistoryDropdownEl = wrapper.querySelector('#fusion-highlight-history');
+                highlightPresets.forEach(preset => {
+                    const option = document.createElement('option');
+                    option.value = preset.id;
+                    option.textContent = preset.label;
+                    highlightPresetEl.appendChild(option);
+                });
+                highlightPresetEl.value = highlightPresets[0].id;
+                highlightInputEl.addEventListener('focus', () => {
+                    renderHistoryDropdown();
+                    highlightHistoryDropdownEl.style.display = 'block';
+                });
+                highlightInputEl.addEventListener('blur', () => {
+                    setTimeout(() => {
+                        highlightHistoryDropdownEl.style.display = 'none';
+                    }, 200);
+                });
+                wrapper.querySelector('#fusion-highlight-add').addEventListener('click', addHighlight);
+                wrapper.querySelector('#fusion-highlight-clear-all').addEventListener('click', () => {
+                    if (confirm('Tem certeza que deseja remover todos os highlights?')) {
+                        highlightsList = [];
+                        persistHighlights();
+                        highlightInputEl.value = '';
+                        renderHighlightsList();
+                        applyHighlightsToAllLines();
+                    }
+                });
+                highlightInputEl.addEventListener('keydown', e => {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        addHighlight();
+                    }
+                });
+                renderHighlightsList();
+                applyHighlightsToAllLines();
             }
 
             function updateCard(title, count, color) {
@@ -745,7 +1050,7 @@
                     <div class="count" style="font-size:2.2em;color:${color}">0</div>
                     <div style="color:#555">${title}</div>
                 `;
-                    document.getElementById('log-stats-cards').appendChild(card);
+                    document.getElementById('log-stats-cards-row').appendChild(card);
                 }
                 card.querySelector('.count').textContent = count;
             }
@@ -919,7 +1224,6 @@
             function updateAll() {
                 // Reseta contadores
                 lastErrorTime = null;
-                currentFilter = 'TOTAL';
                 Object.keys(globalCounts).forEach(k => globalCounts[k] = 0);
                 Object.keys(threadHeat).forEach(k => delete threadHeat[k]);
                 Object.keys(errorPatterns).forEach(k => delete errorPatterns[k]);
@@ -936,17 +1240,126 @@
                 updateCards();
                 applyFilter();
                 renderDashboard();
+                applyHighlightsToAllLines();
             }
 
             new MutationObserver(updateAll).observe(container, {childList: true});
 
-            if (!document.getElementById('fusion-log-css')) {
+            if (!document.getElementById('fusion-log-utils')) {
                 const css = document.createElement('style');
-                css.id = 'fusion-log-css';
+                css.id = 'fusion-log-utils';
                 css.textContent = `
                 #tail_output div:hover {background:${styles.hover}!important;}
-                .pinned {border-left:4px solid red!important;}
-            `;
+                #log-highlight-controls {
+                      margin:0;
+                      padding:0;
+                      background:#fff;
+                      border-radius:0;
+                      border:none;
+                      border-top:1px solid #dee2e6;
+                      box-shadow:none;
+                      font-size:12px;
+                      display:flex !important;
+                      flex-direction:column;
+                      gap:0;
+                      visibility:visible !important;
+                      width:100%;
+                      overflow:visible;
+                  }
+                  #log-highlight-controls .controls {
+                      display:flex;
+                      flex-wrap:wrap;
+                      gap:8px;
+                      align-items:center;
+                      padding:12px;
+                      background:#fff;
+                  }
+                  #log-highlight-controls input {
+                      flex:1;
+                      min-width:180px;
+                      padding:10px 12px;
+                      border-radius:6px;
+                      border:1px solid #c4c4c4;
+                      font-size:13px;
+                      outline:none;
+                      visibility:visible !important;
+                      display:block !important;
+                      background:#fff;
+                      width: -webkit-fill-available;
+                  }
+                  #log-highlight-controls input:focus {
+                      border-color:#2e7d32;
+                      box-shadow:0 0 0 2px rgba(46,125,50,0.1);
+                  }
+                  #log-highlight-controls select {
+                      flex:0 1 auto;
+                      min-width:140px;
+                      padding:10px 12px;
+                      border-radius:6px;
+                      border:1px solid #c4c4c4;
+                      font-size:13px;
+                      outline:none;
+                      visibility:visible !important;
+                      display:block !important;
+                      background:#fff;
+                      cursor:pointer;
+                      height:38px;
+                  }
+                  #log-highlight-controls select:focus {
+                      border-color:#2e7d32;
+                      box-shadow:0 0 0 2px rgba(46,125,50,0.1);
+                  }
+                  #log-highlight-controls button {
+                      padding:10px 16px;
+                      border:none;
+                      border-radius:6px;
+                      background:#2e7d32;
+                      color:#fff;
+                      cursor:pointer;
+                      font-size:13px;
+                      font-weight:600;
+                      display:inline-block;
+                      visibility:visible !important;
+                      transition:background 0.2s ease;
+                      flex:0 0 auto;
+                  }
+                  #log-highlight-controls button#fusion-highlight-clear-all {
+                      padding:10px 14px;
+                      font-size:14px;
+                  }
+                  #log-highlight-controls button:hover {
+                      background:#1b5e20;
+                  }
+                  #log-highlight-controls button:active {
+                      transform:scale(0.98);
+                  }
+                  #log-highlight-controls button.ghost {
+                      background:#f1f1f1;
+                      color:#333;
+                      border:1px solid #ccc;
+                  }
+                  #log-highlight-controls button.ghost:hover {
+                      background:#e0e0e0;
+                      border-color:#bbb;
+                  }
+                  #fusion-highlight-list {
+                      border-top:1px solid #dee2e6;
+                  }
+                  .fusion-highlight-preview {
+                      padding:4px 12px;
+                      border-radius:16px;
+                      font-size:12px;
+                      font-weight:600;
+                      display:inline-block;
+                      white-space:nowrap;
+                      border:1px solid;
+                  }
+                  .fusion-highlight {
+                      border-radius:3px;
+                      padding:0 2px;
+                      font-weight:600;
+                  }
+                `;
                 document.head.appendChild(css);
             }
 
@@ -972,7 +1385,6 @@
             style.id = 'fusion-log-css';
             style.textContent = `
                 #tail_output div:hover {background:${CONFIG.STYLES.hover}!important;}
-                .pinned {border-left:4px solid red!important;}
             `;
             document.head.appendChild(style);
         }
