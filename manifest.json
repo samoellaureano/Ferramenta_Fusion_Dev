@@ -5,10 +5,16 @@
   "icons": {
     "128": "icon.png"
   },
+  "permissions": [
+    "storage"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
   "content_scripts": [
     {
       "matches": [
-        "*://*/fusion/*"
+        "<all_urls>"
       ],
       "js": [
         "script.js"

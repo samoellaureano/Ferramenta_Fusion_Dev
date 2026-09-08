@@ -6,6 +6,7 @@
     <title>Acesso aos recursos do Fusion</title>
     <link rel="stylesheet" href="styles.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;700&display=swap" rel="stylesheet">
+    <script src="popup.js" defer></script>
 </head>
 
 <body>
@@ -14,8 +15,18 @@
         <h2 id="content-heading">Fusion DEV</h2>
         <p>Realizar o acesso a recursos disponibilizados para desenvolvimento na plataforma Fusion.</p>
         <p>Note: Adicionado botão atualizar no frame da atividade.</p>
+        <div class="settings">
+            <label for="fusion-regex">Regex de URL</label>
+            <input type="text" id="fusion-regex" placeholder="\/fusion\/" spellcheck="false" />
+            <span class="settings-hint">Padrão: <code>\/fusion\/</code></span>
+            <div class="settings-actions">
+                <button id="save-regex">Salvar</button>
+                <button id="reset-regex" title="Restaurar padrão">Restaurar padrão</button>
+            </div>
+            <span id="save-status"></span>
+        </div>
         <footer>
-            <span class="version">v 1.21</span>
+            <span class="version">v 1.22</span>
             <a href="https://github.com/samoellaureano/Ferramenta_Fusion_Dev" target="_blank"
                 rel="noopener noreferrer">Repositório GitHub</a>
         </footer>

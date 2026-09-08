@@ -141,8 +141,8 @@
     let sonicAdded = false;
     let scrollOriginal = true;
 
-    const urlBase = window.location.origin + window.location.pathname;
-    const urlSemFusion = urlBase.replace(/\/fusion\/.*$/, '/fusion/');
+    let urlBase = window.location.origin + window.location.pathname;
+    let urlSemFusion = urlBase.replace(/\/fusion\/.*$/, '/fusion/');
 
     // Contadores e estado do log
     let lastTimestampLevel = null;
@@ -2601,5 +2601,25 @@ ORDER BY tran_elapsed_time_seconds DESC;`;
         }
     };
 
-    init();
+    (async () => {
+        const DEFAULT_REGEX = '\\/fusion\\/';
+        const stored = await chrome.storage.local.get('fusionUrlRegex');
+        const pattern = stored.fusionUrlRegex !== undefined ? stored.fusionUrlRegex : DEFAULT_REGEX;
+
+        let regex;
+        try {
+            regex = new RegExp(pattern);
+        } catch (e) {
+            return;
+        }
+
+        if (!regex.test(window.location.href)) return;
+
+        // Se a URL não contém /fusion/, usa a origem como base
+        if (!urlSemFusion.includes('/fusion/')) {
+            urlSemFusion = window.location.origin + '/';
+        }
+
+        init();
+    })();
 })();
