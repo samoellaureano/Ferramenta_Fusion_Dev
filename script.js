@@ -2,6 +2,120 @@
     'use strict';
 
     // ================= CONFIGURAÇÕES GLOBAIS =================
+    const PAGINAS_CONTROLE_EXTENSAO = [
+        "/fusion/adm/sql.jsp",
+        "/fusion/adm/tomcatLog.jsp",
+        "/fusion/adm/mem.jsp"
+    ];
+
+    const paginaPermiteControleExtensao = () =>
+        PAGINAS_CONTROLE_EXTENSAO.some(path =>
+            window.location.pathname.startsWith(path)
+        );
+
+    const EXTENSION_DISABLED_KEY =
+        "fusion-extension-disabled-sql";
+
+    const extensaoDesativada = () =>
+        sessionStorage.getItem(
+            EXTENSION_DISABLED_KEY
+        ) === "true";
+
+    const criarControleExtensao = () => {
+        const button = document.getElementById(
+            "fusion-extension-toggle"
+        );
+
+        const style = document.getElementById(
+            "fusion-extension-toggle-style"
+        );
+
+        if (!paginaPermiteControleExtensao()) {
+            button?.remove();
+            style?.remove();
+            return;
+        }
+
+        if (!style) {
+            const toggleStyle = document.createElement("style");
+
+            toggleStyle.id =
+                "fusion-extension-toggle-style";
+
+            toggleStyle.textContent = `
+            #fusion-extension-toggle {
+                position: fixed;
+                top: 12px;
+                right: 12px;
+                z-index: 2147483647;
+                padding: 9px 14px;
+                border: 0;
+                border-radius: 6px;
+                background: #c62828;
+                color: #fff;
+                cursor: pointer;
+                font: 600 12px Arial, sans-serif;
+                box-shadow: 0 3px 12px rgba(0,0,0,.3);
+            }
+
+            #fusion-extension-toggle:hover {
+                background: #a51f1f;
+            }
+
+            #fusion-extension-toggle.disabled {
+                background: #2e7d32;
+            }
+
+            #fusion-extension-toggle.disabled:hover {
+                background: #1b5e20;
+            }
+        `;
+
+            document.head.appendChild(toggleStyle);
+        }
+
+        let toggleButton = button;
+
+        if (!toggleButton) {
+            toggleButton = document.createElement("button");
+            toggleButton.id = "fusion-extension-toggle";
+            toggleButton.type = "button";
+
+            toggleButton.addEventListener("click", () => {
+                if (extensaoDesativada()) {
+                    sessionStorage.removeItem(
+                        EXTENSION_DISABLED_KEY
+                    );
+                } else {
+                    sessionStorage.setItem(
+                        EXTENSION_DISABLED_KEY,
+                        "true"
+                    );
+
+                    localStorage.setItem(
+                        SQL_ACTIVE_KEY,
+                        "false"
+                    );
+                }
+
+                window.location.reload();
+            });
+
+            document.body.appendChild(toggleButton);
+        }
+
+        const disabled = extensaoDesativada();
+
+        toggleButton.textContent = disabled
+            ? "Ativar extensão"
+            : "Desativar extensão";
+
+        toggleButton.classList.toggle(
+            "disabled",
+            disabled
+        );
+    };
+
     const CONFIG = {
         LOG_HEADER_REGEX: /^(\d{4}-\d{2}-\d{2}-\d{2}:\d{2}:\d{2}\.\d{3})\s+(ERROR|WARN|INFO|DEBUG)/,
         THREAD_REGEX: /\[(.*?)\]/,
@@ -454,7 +568,8 @@
         container.style.background = '#f9f9f9';
         container.style.display = 'inline-block';
         container.style.width = '-webkit-fill-available';
-        container.style.marginTop = '-19rem';
+        container.style.marginTop = '0';
+        container.style.marginBlockStart = '0';
 
         // HTML da visualização
         container.innerHTML = `
@@ -531,7 +646,7 @@
 
         // Adicionar a visualização ao documento
         document.head.appendChild(style);
-        document.body.appendChild(container);
+        document.body.prepend(container);
     }
 
     function insertStyleLogs() {
@@ -1249,116 +1364,133 @@
                 const css = document.createElement('style');
                 css.id = 'fusion-log-utils';
                 css.textContent = `
-                #tail_output div:hover {background:${styles.hover}!important;}
+                #tail_output div:hover {
+                    background:${styles.hover}!important;
+                }
+
                 #log-highlight-controls {
-                      margin:0;
-                      padding:0;
-                      background:#fff;
-                      border-radius:0;
-                      border:none;
-                      border-top:1px solid #dee2e6;
-                      box-shadow:none;
-                      font-size:12px;
-                      display:flex !important;
-                      flex-direction:column;
-                      gap:0;
-                      visibility:visible !important;
-                      width:100%;
-                      overflow:visible;
-                  }
-                  #log-highlight-controls .controls {
-                      display:flex;
-                      flex-wrap:wrap;
-                      gap:8px;
-                      align-items:center;
-                      padding:12px;
-                      background:#fff;
-                  }
-                  #log-highlight-controls input {
-                      flex:1;
-                      min-width:180px;
-                      padding:10px 12px;
-                      border-radius:6px;
-                      border:1px solid #c4c4c4;
-                      font-size:13px;
-                      outline:none;
-                      visibility:visible !important;
-                      display:block !important;
-                      background:#fff;
-                      width: -webkit-fill-available;
-                  }
-                  #log-highlight-controls input:focus {
-                      border-color:#2e7d32;
-                      box-shadow:0 0 0 2px rgba(46,125,50,0.1);
-                  }
-                  #log-highlight-controls select {
-                      flex:0 1 auto;
-                      min-width:140px;
-                      padding:10px 12px;
-                      border-radius:6px;
-                      border:1px solid #c4c4c4;
-                      font-size:13px;
-                      outline:none;
-                      visibility:visible !important;
-                      display:block !important;
-                      background:#fff;
-                      cursor:pointer;
-                      height:38px;
-                  }
-                  #log-highlight-controls select:focus {
-                      border-color:#2e7d32;
-                      box-shadow:0 0 0 2px rgba(46,125,50,0.1);
-                  }
-                  #log-highlight-controls button {
-                      padding:10px 16px;
-                      border:none;
-                      border-radius:6px;
-                      background:#2e7d32;
-                      color:#fff;
-                      cursor:pointer;
-                      font-size:13px;
-                      font-weight:600;
-                      display:inline-block;
-                      visibility:visible !important;
-                      transition:background 0.2s ease;
-                      flex:0 0 auto;
-                  }
-                  #log-highlight-controls button#fusion-highlight-clear-all {
-                      padding:10px 14px;
-                      font-size:14px;
-                  }
-                  #log-highlight-controls button:hover {
-                      background:#1b5e20;
-                  }
-                  #log-highlight-controls button:active {
-                      transform:scale(0.98);
-                  }
-                  #log-highlight-controls button.ghost {
-                      background:#f1f1f1;
-                      color:#333;
-                      border:1px solid #ccc;
-                  }
-                  #log-highlight-controls button.ghost:hover {
-                      background:#e0e0e0;
-                      border-color:#bbb;
-                  }
-                  #fusion-highlight-list {
-                      border-top:1px solid #dee2e6;
-                  }
-                  .fusion-highlight-preview {
-                      padding:4px 12px;
-                      border-radius:16px;
-                      font-size:12px;
-                      font-weight:600;
-                      display:inline-block;
-                      white-space:nowrap;
-                      border:1px solid;
-                  }
-                  .fusion-highlight {
-                      border-radius:3px;
-                      padding:0 2px;
-                      font-weight:600;
-                  }
+                    margin:0;
+                    padding:0;
+                    background:#fff;
+                    border-radius:0;
+                    border:none;
+                    border-top:1px solid #dee2e6;
+                    box-shadow:none;
+                    font-size:12px;
+                    display:flex !important;
+                    flex-direction:column;
+                    gap:0;
+                    visibility:visible !important;
+                    width:100%;
+                    overflow:visible;
+                }
+
+                #log-highlight-controls .controls {
+                    display:flex;
+                    flex-wrap:wrap;
+                    gap:8px;
+                    align-items:center;
+                    padding:12px;
+                    background:#fff;
+                }
+
+                #log-highlight-controls input {
+                    flex:1;
+                    min-width:180px;
+                    padding:10px 12px;
+                    border-radius:6px;
+                    border:1px solid #c4c4c4;
+                    font-size:13px;
+                    outline:none;
+                    visibility:visible !important;
+                    display:block !important;
+                    background:#fff;
+                    width: -webkit-fill-available;
+                }
+
+                #log-highlight-controls input:focus {
+                    border-color:#2e7d32;
+                    box-shadow:0 0 0 2px rgba(46,125,50,0.1);
+                }
+
+                #log-highlight-controls select {
+                    flex:0 1 auto;
+                    min-width:140px;
+                    padding:10px 12px;
+                    border-radius:6px;
+                    border:1px solid #c4c4c4;
+                    font-size:13px;
+                    outline:none;
+                    visibility:visible !important;
+                    display:block !important;
+                    background:#fff;
+                    cursor:pointer;
+                    height:38px;
+                }
+
+                #log-highlight-controls select:focus {
+                    border-color:#2e7d32;
+                    box-shadow:0 0 0 2px rgba(46,125,50,0.1);
+                }
+
+                #log-highlight-controls button {
+                    padding:10px 16px;
+                    border:none;
+                    border-radius:6px;
+                    background:#2e7d32;
+                    color:#fff;
+                    cursor:pointer;
+                    font-size:13px;
+                    font-weight:600;
+                    display:inline-block;
+                    visibility:visible !important;
+                    transition:background 0.2s ease;
+                    flex:0 0 auto;
+                }
+
+                #log-highlight-controls button#fusion-highlight-clear-all {
+                    padding:10px 14px;
+                    font-size:14px;
+                }
+
+                #log-highlight-controls button:hover {
+                    background:#1b5e20;
+                }
+
+                #log-highlight-controls button:active {
+                    transform:scale(0.98);
+                }
+
+                #log-highlight-controls button.ghost {
+                    background:#f1f1f1;
+                    color:#333;
+                    border:1px solid #ccc;
+                }
+
+                #log-highlight-controls button.ghost:hover {
+                    background:#e0e0e0;
+                    border-color:#bbb;
+                }
+
+                #fusion-highlight-list {
+                    border-top:1px solid #dee2e6;
+                }
+
+                .fusion-highlight-preview {
+                    padding:4px 12px;
+                    border-radius:16px;
+                    font-size:12px;
+                    font-weight:600;
+                    display:inline-block;
+                    white-space:nowrap;
+                    border:1px solid;
+                }
+
+                .fusion-highlight {
+                    border-radius:3px;
+                    padding:0 2px;
+                    font-weight:600;
+                }
                 `;
                 document.head.appendChild(css);
             }
@@ -1453,6 +1585,10 @@ ORDER BY tran_elapsed_time_seconds DESC;`;
     };
 
     const inserirMonitorSql = () => {
+        if (extensaoDesativada()) {
+            return;
+        }
+
         if (!location.pathname.endsWith("/fusion/adm/sql.jsp")) {
             return;
         }
@@ -1472,6 +1608,26 @@ ORDER BY tran_elapsed_time_seconds DESC;`;
 
         if (!maxInput || !sqlInput) {
             return;
+        }
+
+        const executeButton = form.querySelector(
+            'input[type="submit"][value="Continuar"]'
+        );
+
+        const sqlTitle = document.querySelector(
+            "#headerTitle, #cwh_window_title .title_01"
+        );
+
+        if (executeButton) {
+            executeButton.value = "Executar";
+            executeButton.classList.add(
+                "fusion-sql-execute-button"
+            );
+        }
+
+        if (sqlTitle) {
+            sqlTitle.textContent = "SQL Editor";
+            sqlTitle.classList.add("fusion-sql-page-title");
         }
 
         let resultTable =
@@ -1498,7 +1654,6 @@ ORDER BY tran_elapsed_time_seconds DESC;`;
 
         style.textContent = `
         #fusion-sql-monitor-shell {
-            margin: 24px auto;
             padding: 0 12px;
             font-family: Arial, sans-serif;
         }
@@ -1670,6 +1825,140 @@ ORDER BY tran_elapsed_time_seconds DESC;`;
         #fusion-sql-clear-button:hover {
             background: #455a64;
         }
+
+        #fusion-sql-monitor .fusion-sql-disable-button {
+            background: #607d8b;
+        }
+
+        #fusion-sql-monitor .fusion-sql-disable-button:hover {
+            background: #455a64;
+        }
+
+        .fusion-sql-example {
+            position: relative;
+            margin: 0 0 18px;
+            padding: 16px 18px 16px 20px;
+            border: 1px solid #b8d8f5;
+            border-left: 5px solid #1976d2;
+            border-radius: 8px;
+            background: linear-gradient(
+                135deg,
+                #f4f9ff 0%,
+                #e8f2fc 100%
+            );
+            color: #37474f;
+            font: 13px/1.6 Arial, sans-serif;
+            box-shadow: 0 2px 7px rgba(25, 118, 210, .10);
+        }
+
+        .fusion-sql-example::before {
+            content: "i";
+            position: absolute;
+            top: 15px;
+            left: -14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 24px;
+            height: 24px;
+            border: 3px solid #fff;
+            border-radius: 50%;
+            background: #1976d2;
+            color: #fff;
+            font: bold 14px Arial, sans-serif;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, .2);
+        }
+
+        .fusion-sql-example strong {
+            display: block;
+            margin-bottom: 8px;
+            color: #125ca1;
+            font-size: 14px;
+        }
+
+        .fusion-sql-example .example-line {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin: 5px 0;
+        }
+
+        .fusion-sql-example .example-label {
+            min-width: 150px;
+            color: #546e7a;
+        }
+
+        .fusion-sql-example code {
+            padding: 3px 7px;
+            border: 1px solid #c3dff7;
+            border-radius: 4px;
+            background: #fff;
+            color: #0d47a1;
+            font: 600 12px Consolas, "Courier New", monospace;
+        }
+
+        .fusion-sql-example .example-tip {
+            margin-top: 10px;
+            padding-top: 9px;
+            border-top: 1px solid #c9e0f5;
+            color: #546e7a;
+            font-size: 12px;
+        }
+
+        @media (max-width: 600px) {
+            .fusion-sql-example .example-line {
+                align-items: flex-start;
+                flex-direction: column;
+                gap: 2px;
+            }
+
+            .fusion-sql-example .example-label {
+                min-width: auto;
+            }
+        }
+        
+        #headerTitle,
+        #cwh_window_title .title_01,
+        .fusion-sql-page-title {
+            display: flex !important;
+            align-items: center;
+            min-height: 42px;
+            margin: 0 !important;
+            padding: 0 18px !important;
+            border-radius: 8px 8px 0 0;
+            background: linear-gradient(
+                135deg,
+                #263238,
+                #1976d2
+            );
+            color: #fff !important;
+            font: 700 18px/1 Arial, sans-serif !important;
+            letter-spacing: .2px;
+            box-shadow: 0 2px 8px rgba(0,0,0,.18);
+        }
+
+        .fusion-sql-execute-button {
+            min-width: 100px;
+            margin-top: 8px;
+            padding: 9px 18px !important;
+            border: 0 !important;
+            border-radius: 6px !important;
+            background: #2e7d32 !important;
+            color: #fff !important;
+            cursor: pointer;
+            font: 600 13px Arial, sans-serif;
+            box-shadow: 0 2px 5px rgba(0,0,0,.16);
+            transition: background .2s ease,
+                        transform .1s ease;
+        }
+
+        .fusion-sql-execute-button:hover {
+            background: #1b5e20 !important;
+        }
+
+        .fusion-sql-execute-button:active {
+            transform: translateY(1px);
+        }
     `;
 
         document.head.appendChild(style);
@@ -1734,6 +2023,34 @@ ORDER BY tran_elapsed_time_seconds DESC;`;
         const panel = document.createElement("div");
         panel.id = "fusion-sql-monitor-panel";
 
+        const example = document.createElement("div");
+        example.className = "fusion-sql-example";
+
+        example.innerHTML = `
+            <strong>Exemplo de configuração</strong>
+
+            <div class="example-line">
+                <span class="example-label">Ambiente principal:</span>
+                <span>ID do banco <code>5</code></span>
+                <span>|</span>
+                <span>Nome <code>Produção</code></span>
+            </div>
+
+            <div class="example-line">
+                <span class="example-label">Segundo ambiente:</span>
+                <span>ID do banco <code>6</code></span>
+                <span>|</span>
+                <span>Nome <code>Homologação</code></span>
+            </div>
+
+            <div class="example-tip">
+                Informe também o intervalo entre consultas.
+                Exemplo: <code>1 segundo</code>.
+            </div>
+        `;
+
+        panel.appendChild(example);
+
         const intervalRow = document.createElement("div");
         intervalRow.className = "fusion-sql-row";
 
@@ -1783,6 +2100,44 @@ ORDER BY tran_elapsed_time_seconds DESC;`;
         const setStatus = (message, type = "") => {
             status.textContent = message;
             status.className = type;
+        };
+
+        const desativarExtensao = () => {
+            sessionStorage.setItem(
+                EXTENSION_DISABLED_KEY,
+                "true"
+            );
+
+            localStorage.setItem(
+                SQL_ACTIVE_KEY,
+                "false"
+            );
+
+            clearTimeout(verificationTimer);
+
+            const resultWrapper =
+                document.getElementById("fusion-sql-results");
+
+            if (resultWrapper) {
+                while (resultWrapper.firstChild) {
+                    resultWrapper.parentNode.insertBefore(
+                        resultWrapper.firstChild,
+                        resultWrapper
+                    );
+                }
+
+                resultWrapper.remove();
+            }
+
+            document
+                .querySelectorAll(
+                    "#fusion-sql-monitor-shell, " +
+                    "#fusion-sql-monitor-style, " +
+                    "#fusion-sql-clear-button"
+                )
+                .forEach(element => element.remove());
+
+            form.removeAttribute("id");
         };
 
         const renderEnvironments = () => {
@@ -2075,25 +2430,48 @@ ORDER BY tran_elapsed_time_seconds DESC;`;
 
     // ================= INICIALIZAÇÃO =================
     const init = () => {
-        // Carregar Font Awesome
+        /*
+         * Este botão é criado antes de qualquer bloqueio,
+         * portanto permanece disponível para reativação.
+         */
+        criarControleExtensao();
+
+        if (extensaoDesativada()) {
+            return;
+        }
+
         if (!$('link[href*="font-awesome"]')) {
-            const link = document.createElement('link');
-            link.rel = 'stylesheet';
-            link.href = 'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css';
+            const link = document.createElement("link");
+
+            link.rel = "stylesheet";
+            link.href =
+                "https://cdnjs.cloudflare.com/ajax/libs/" +
+                "font-awesome/5.15.3/css/all.min.css";
+
             document.head.appendChild(link);
         }
 
-        // CSS geral
-        if (!$('#fusion-log-css')) {
-            const style = document.createElement('style');
-            style.id = 'fusion-log-css';
+        if (!$("#fusion-log-css")) {
+            const style = document.createElement("style");
+
+            style.id = "fusion-log-css";
+
             style.textContent = `
-                #tail_output div:hover {background:${CONFIG.STYLES.hover}!important;}
-            `;
+            #tail_output div:hover {
+                background:${CONFIG.STYLES.hover}!important;
+            }
+        `;
+
             document.head.appendChild(style);
         }
 
         setInterval(() => {
+            criarControleExtensao();
+
+            if (extensaoDesativada()) {
+                return;
+            }
+
             atualizarVisibilidadeDump();
             habilitarCopyCampos();
             ajustarEstilosRelatorio();
@@ -2110,7 +2488,10 @@ ORDER BY tran_elapsed_time_seconds DESC;`;
 
         if (location.href.includes("adm/mem.jsp")) {
             insertStyleMemReport();
-        } else if (location.href.includes("adm/tomcatLog.jsp") || location.href.includes("adm/log.jsp")) {
+        } else if (
+            location.href.includes("adm/tomcatLog.jsp") ||
+            location.href.includes("adm/log.jsp")
+        ) {
             insertStyleLogs();
         }
     };
