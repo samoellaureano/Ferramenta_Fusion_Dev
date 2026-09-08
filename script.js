@@ -1530,6 +1530,139 @@
         localStorage.setItem(key, JSON.stringify(value));
     };
 
+    const removerComentariosSql = sql =>
+        sql
+            .replace(/\/\*[\s\S]*?\*\//g, " ")
+            .replace(/--.*$/gm, " ");
+
+    const validarSql = sql => {
+        const original = String(sql || "").trim();
+
+        if (!original) {
+            return {
+                valid: false,
+                errors: ["Informe um comando SQL."]
+            };
+        }
+
+        const withoutComments = removerComentariosSql(original);
+        const normalized = withoutComments
+            .replace(/\s+/g, " ")
+            .trim()
+            .toUpperCase();
+
+        const errors = [];
+        const warnings = [];
+
+        let quoteOpen = false;
+        let parenthesisLevel = 0;
+
+        for (let index = 0; index < withoutComments.length; index++) {
+            const char = withoutComments[index];
+
+            if (char === "'") {
+                if (
+                    withoutComments[index + 1] === "'" &&
+                    quoteOpen
+                ) {
+                    index++;
+                    continue;
+                }
+
+                quoteOpen = !quoteOpen;
+                continue;
+            }
+
+            if (quoteOpen) {
+                continue;
+            }
+
+            if (char === "(") {
+                parenthesisLevel++;
+            }
+
+            if (char === ")") {
+                parenthesisLevel--;
+
+                if (parenthesisLevel < 0) {
+                    errors.push("Existem parênteses fechando incorretamente.");
+                    break;
+                }
+            }
+        }
+
+        if (quoteOpen) {
+            errors.push("Existe uma string sem aspas de fechamento.");
+        }
+
+        if (parenthesisLevel !== 0) {
+            errors.push("Os parênteses não estão balanceados.");
+        }
+
+        if (/\b(DROP|TRUNCATE|ALTER)\b/i.test(normalized)) {
+            errors.push(
+                "Comandos DROP, TRUNCATE e ALTER não são permitidos."
+            );
+        }
+
+        const statements = withoutComments
+            .split(";")
+            .map(statement => statement.trim())
+            .filter(Boolean);
+
+        for (const statement of statements) {
+            const statementNormalized = statement
+                .replace(/\s+/g, " ")
+                .trim()
+                .toUpperCase();
+
+            const isUpdate = /^UPDATE\b/.test(statementNormalized);
+            const isDelete = /^DELETE\b/.test(statementNormalized);
+
+            if (isUpdate || isDelete) {
+                if (!/\bWHERE\b/.test(statementNormalized)) {
+                    errors.push(
+                        `${isUpdate ? "UPDATE" : "DELETE"} exige uma cláusula WHERE.`
+                    );
+                }
+
+                if (
+                    /\bWHERE\s+(1\s*=\s*1|TRUE)\b/.test(
+                        statementNormalized
+                    )
+                ) {
+                    errors.push(
+                        "A condição WHERE é ampla demais."
+                    );
+                }
+            }
+        }
+
+        if (/\bSELECT\s+\*/i.test(withoutComments)) {
+            warnings.push(
+                "Prefira informar as colunas em vez de usar SELECT *."
+            );
+        }
+
+        if (/\bUPDATE\b/i.test(withoutComments)) {
+            warnings.push(
+                "Confirme a quantidade de registros afetados antes do UPDATE."
+            );
+        }
+
+        if (/\bDELETE\b/i.test(withoutComments)) {
+            warnings.push(
+                "Confirme o filtro do DELETE antes de executar."
+            );
+        }
+
+        return {
+            valid: errors.length === 0,
+            errors,
+            warnings
+        };
+    };
+
     const montarSqlMonitor = environments => {
         const configuredEnvironments = Array.isArray(environments)
             ? environments.filter(environment =>
@@ -1539,17 +1672,18 @@
             )
             : [];
 
-        const ambienteSelect = configuredEnvironments.length === 0
-            ? "    sess.database_id AS ambiente,"
-            : `    CASE
+        const ambienteSelect =
+            configuredEnvironments.length === 0
+                ? "    sess.database_id AS ambiente,"
+                : `    CASE
 ${configuredEnvironments.map(environment => {
-                const id = Number(environment.id);
-                const label = String(environment.label)
-                    .trim()
-                    .replace(/'/g, "''");
+                    const id = Number(environment.id);
+                    const label = String(environment.label)
+                        .trim()
+                        .replace(/'/g, "''");
 
-                return `        WHEN sess.database_id = ${id} THEN '${label}'`;
-            }).join("\n")}
+                    return `        WHEN sess.database_id = ${id} THEN '${label}'`;
+                }).join("\n")}
         ELSE CAST(sess.database_id AS VARCHAR(20))
     END AS ambiente,`;
 
@@ -1589,7 +1723,11 @@ ORDER BY tran_elapsed_time_seconds DESC;`;
             return;
         }
 
-        if (!location.pathname.endsWith("/fusion/adm/sql.jsp")) {
+        if (
+            !window.location.pathname.endsWith(
+                "/fusion/adm/sql.jsp"
+            )
+        ) {
             return;
         }
 
@@ -1605,49 +1743,16 @@ ORDER BY tran_elapsed_time_seconds DESC;`;
 
         const maxInput = form.querySelector('input[name="max"]');
         const sqlInput = form.querySelector('textarea[name="sql"]');
+        const executeButton = form.querySelector(
+            'input[type="submit"], input[type="button"][value="Continuar"]'
+        );
 
-        if (!maxInput || !sqlInput) {
+        if (!maxInput || !sqlInput || !executeButton) {
             return;
         }
 
-        const executeButton = form.querySelector(
-            'input[type="submit"][value="Continuar"]'
-        );
-
-        const sqlTitle = document.querySelector(
-            "#headerTitle, #cwh_window_title .title_01"
-        );
-
-        if (executeButton) {
-            executeButton.value = "Executar";
-            executeButton.classList.add(
-                "fusion-sql-execute-button"
-            );
-        }
-
-        if (sqlTitle) {
-            sqlTitle.textContent = "SQL Editor";
-            sqlTitle.classList.add("fusion-sql-page-title");
-        }
-
-        let resultTable =
-            document.getElementById("resultTable");
-
-        let resultsWrapper =
-            document.getElementById("fusion-sql-results");
-
-        let environments = lerStorage(
-            SQL_ENVIRONMENTS_KEY,
-            SQL_DEFAULT_ENVIRONMENTS
-        );
-
-        let settings = lerStorage(
-            SQL_SETTINGS_KEY,
-            SQL_DEFAULT_SETTINGS
-        );
-
-        let verificationTimer = null;
-        let requestInProgress = false;
+        executeButton.value = "Executar";
+        executeButton.classList.add("fusion-sql-execute-button");
 
         const style = document.createElement("style");
         style.id = "fusion-sql-monitor-style";
@@ -1668,7 +1773,6 @@ ORDER BY tran_elapsed_time_seconds DESC;`;
 
         #fusion-sql-monitor {
             display: inline-flex;
-            align-items: center;
             gap: 10px;
         }
 
@@ -1698,6 +1802,7 @@ ORDER BY tran_elapsed_time_seconds DESC;`;
             gap: 6px;
             color: #546e7a;
             font-size: 12px;
+            color: #546e7a;
         }
 
         #fusion-sql-monitor-status.loading {
@@ -1706,6 +1811,11 @@ ORDER BY tran_elapsed_time_seconds DESC;`;
 
         #fusion-sql-monitor-status.error {
             color: #c62828;
+            font-weight: 600;
+        }
+
+        #fusion-sql-monitor-status.warning {
+            color: #ef6c00;
         }
 
         #fusion-sql-monitor-panel {
@@ -1778,8 +1888,26 @@ ORDER BY tran_elapsed_time_seconds DESC;`;
             resize: vertical;
         }
 
+        .fusion-sql-message {
+            margin: 8px 0;
+            padding: 10px 12px;
+            border-radius: 5px;
+            font: 12px/1.5 Arial, sans-serif;
+        }
+
+        .fusion-sql-message.error {
+            background: #ffebee;
+            border: 1px solid #ef9a9a;
+            color: #b71c1c;
+        }
+
+        .fusion-sql-message.warning {
+            background: #fff3e0;
+            border: 1px solid #ffcc80;
+            color: #e65100;
+        }
+
         #fusion-sql-results {
-            margin: 0 auto;
             overflow-x: auto;
         }
 
@@ -1946,49 +2074,43 @@ ORDER BY tran_elapsed_time_seconds DESC;`;
             background: #2e7d32 !important;
             color: #fff !important;
             cursor: pointer;
-            font: 600 13px Arial, sans-serif;
-            box-shadow: 0 2px 5px rgba(0,0,0,.16);
-            transition: background .2s ease,
-                        transform .1s ease;
+            font-weight: 600;
         }
 
         .fusion-sql-execute-button:hover {
             background: #1b5e20 !important;
         }
 
-        .fusion-sql-execute-button:active {
-            transform: translateY(1px);
+        #fusion-sql-clear-button {
+            margin: 0 0 12px;
+            padding: 6px 10px;
+            border: 0;
+            border-radius: 5px;
+            background: #c62828;
+            color: #fff;
+            cursor: pointer;
+            font-weight: 600;
         }
     `;
 
         document.head.appendChild(style);
 
-        /*
-         * Cria o container de resultados mesmo quando a página
-         * ainda não possui uma tabela.
-         */
+        let resultTable = document.getElementById("resultTable");
+        let resultsWrapper = document.getElementById(
+            "fusion-sql-results"
+        );
+
         if (!resultsWrapper) {
             resultsWrapper = document.createElement("div");
             resultsWrapper.id = "fusion-sql-results";
+            form.parentNode.insertBefore(
+                resultsWrapper,
+                form.nextSibling
+            );
 
             if (resultTable) {
-                resultTable.parentNode.insertBefore(
-                    resultsWrapper,
-                    resultTable
-                );
-
                 resultsWrapper.appendChild(resultTable);
-            } else {
-                form.parentNode.insertBefore(
-                    resultsWrapper,
-                    form.nextSibling
-                );
             }
-        } else if (
-            resultTable &&
-            !resultsWrapper.contains(resultTable)
-        ) {
-            resultsWrapper.appendChild(resultTable);
         }
 
         const shell = document.createElement("div");
@@ -1997,8 +2119,8 @@ ORDER BY tran_elapsed_time_seconds DESC;`;
         const toolbar = document.createElement("div");
         toolbar.id = "fusion-sql-monitor-toolbar";
 
-        const monitorWrapper = document.createElement("span");
-        monitorWrapper.id = "fusion-sql-monitor";
+        const monitor = document.createElement("span");
+        monitor.id = "fusion-sql-monitor";
 
         const verifyButton = document.createElement("button");
         verifyButton.type = "button";
@@ -2010,15 +2132,12 @@ ORDER BY tran_elapsed_time_seconds DESC;`;
         const status = document.createElement("span");
         status.id = "fusion-sql-monitor-status";
 
-        monitorWrapper.append(
+        monitor.append(
             verifyButton,
             configureButton
         );
 
-        toolbar.append(
-            monitorWrapper,
-            status
-        );
+        toolbar.append(monitor, status);
 
         const panel = document.createElement("div");
         panel.id = "fusion-sql-monitor-panel";
@@ -2062,8 +2181,20 @@ ORDER BY tran_elapsed_time_seconds DESC;`;
         intervalInput.type = "number";
         intervalInput.min = "0.1";
         intervalInput.step = "0.1";
+
+        let environments = lerStorage(
+            SQL_ENVIRONMENTS_KEY,
+            SQL_DEFAULT_ENVIRONMENTS
+        );
+
+        let settings = lerStorage(
+            SQL_SETTINGS_KEY,
+            SQL_DEFAULT_SETTINGS
+        );
+
         intervalInput.value =
             Number(settings.intervalSeconds) || 1;
+
         intervalInput.style.width = "70px";
 
         intervalRow.append(
@@ -2071,8 +2202,7 @@ ORDER BY tran_elapsed_time_seconds DESC;`;
             intervalInput
         );
 
-        const environmentsContainer =
-            document.createElement("div");
+        const environmentsContainer = document.createElement("div");
 
         const addButton = document.createElement("button");
         addButton.type = "button";
@@ -2089,55 +2219,39 @@ ORDER BY tran_elapsed_time_seconds DESC;`;
             saveButton
         );
 
-        shell.append(
-            toolbar,
-            panel
-        );
-
+        shell.append(toolbar, panel);
         form.parentNode.insertBefore(shell, form);
         form.id = "fusion-sql-form-wrapper";
+
+        const messageBox = document.createElement("div");
+        messageBox.id = "fusion-sql-validation-message";
+        form.insertBefore(messageBox, sqlInput);
 
         const setStatus = (message, type = "") => {
             status.textContent = message;
             status.className = type;
         };
 
-        const desativarExtensao = () => {
-            sessionStorage.setItem(
-                EXTENSION_DISABLED_KEY,
-                "true"
-            );
+        const showValidation = result => {
+            messageBox.innerHTML = "";
 
-            localStorage.setItem(
-                SQL_ACTIVE_KEY,
-                "false"
-            );
-
-            clearTimeout(verificationTimer);
-
-            const resultWrapper =
-                document.getElementById("fusion-sql-results");
-
-            if (resultWrapper) {
-                while (resultWrapper.firstChild) {
-                    resultWrapper.parentNode.insertBefore(
-                        resultWrapper.firstChild,
-                        resultWrapper
-                    );
-                }
-
-                resultWrapper.remove();
+            if (result.errors.length) {
+                const error = document.createElement("div");
+                error.className = "fusion-sql-message error";
+                error.textContent =
+                    "Execução bloqueada: " +
+                    result.errors.join(" ");
+                messageBox.appendChild(error);
             }
 
-            document
-                .querySelectorAll(
-                    "#fusion-sql-monitor-shell, " +
-                    "#fusion-sql-monitor-style, " +
-                    "#fusion-sql-clear-button"
-                )
-                .forEach(element => element.remove());
-
-            form.removeAttribute("id");
+            if (result.warnings.length) {
+                const warning = document.createElement("div");
+                warning.className = "fusion-sql-message warning";
+                warning.textContent =
+                    "Atenção: " +
+                    result.warnings.join(" ");
+                messageBox.appendChild(warning);
+            }
         };
 
         const renderEnvironments = () => {
@@ -2160,8 +2274,8 @@ ORDER BY tran_elapsed_time_seconds DESC;`;
 
                 const removeButton = document.createElement("button");
                 removeButton.type = "button";
-                removeButton.className = "fusion-sql-remove";
                 removeButton.textContent = "Remover";
+                removeButton.className = "fusion-sql-remove";
 
                 removeButton.onclick = () => {
                     environments.splice(index, 1);
@@ -2183,8 +2297,8 @@ ORDER BY tran_elapsed_time_seconds DESC;`;
             });
         };
 
-        const collectEnvironments = () => {
-            return [...environmentsContainer.children]
+        const collectEnvironments = () =>
+            [...environmentsContainer.children]
                 .map(row => ({
                     id: Number(row.idInput.value),
                     label: row.labelInput.value.trim()
@@ -2194,13 +2308,9 @@ ORDER BY tran_elapsed_time_seconds DESC;`;
                     environment.id >= 0 &&
                     environment.label
                 );
-        };
 
         const saveCurrentSettings = () => {
-            const currentEnvironments =
-                collectEnvironments();
-
-            environments = currentEnvironments;
+            environments = collectEnvironments();
 
             settings = {
                 intervalSeconds: Math.max(
@@ -2237,59 +2347,23 @@ ORDER BY tran_elapsed_time_seconds DESC;`;
                 ? "Interromper verificação"
                 : "Verificar transações";
 
-            verifyButton.classList.toggle(
-                "active",
-                active
-            );
-
-            if (!document.getElementById("fusion-sql-clear-button")) {
-                const clearSqlButton = document.createElement("button");
-
-                clearSqlButton.id = "fusion-sql-clear-button";
-                clearSqlButton.type = "button";
-                clearSqlButton.textContent = "Limpar SQL";
-
-                clearSqlButton.onclick = () => {
-                    sqlInput.value = "";
-
-                    sqlInput.dispatchEvent(
-                        new Event("input", { bubbles: true })
-                    );
-
-                    sqlInput.dispatchEvent(
-                        new Event("change", { bubbles: true })
-                    );
-
-                    sqlInput.focus();
-                };
-
-                sqlInput.insertAdjacentElement(
-                    "afterend",
-                    clearSqlButton
-                );
-            }
+            verifyButton.classList.toggle("active", active);
         };
 
         const updateResults = html => {
-            const parser = new DOMParser();
-
-            const responseDocument = parser.parseFromString(
-                html,
-                "text/html"
-            );
+            const responseDocument = new DOMParser()
+                .parseFromString(html, "text/html");
 
             const newResultTable =
                 responseDocument.querySelector("#resultTable");
 
             if (!newResultTable) {
                 resultTable = null;
-
                 resultsWrapper.innerHTML = `
                 <div class="fusion-sql-empty">
                     Nenhum resultado retornado.
                 </div>
             `;
-
                 return;
             }
 
@@ -2298,6 +2372,28 @@ ORDER BY tran_elapsed_time_seconds DESC;`;
             resultsWrapper.appendChild(resultTable);
         };
 
+        const clearButton = document.createElement("button");
+        clearButton.id = "fusion-sql-clear-button";
+        clearButton.type = "button";
+        clearButton.textContent = "Limpar SQL";
+
+        clearButton.onclick = () => {
+            sqlInput.value = "";
+            sqlInput.dispatchEvent(
+                new Event("input", { bubbles: true })
+            );
+            sqlInput.focus();
+            messageBox.innerHTML = "";
+        };
+
+        sqlInput.insertAdjacentElement(
+            "afterend",
+            clearButton
+        );
+
+        let verificationTimer = null;
+        let requestInProgress = false;
+
         const scheduleNextVerification = () => {
             clearTimeout(verificationTimer);
 
@@ -2305,15 +2401,12 @@ ORDER BY tran_elapsed_time_seconds DESC;`;
                 return;
             }
 
-            const interval =
+            verificationTimer = setTimeout(
+                executeVerification,
                 Math.max(
                     0.1,
                     Number(settings.intervalSeconds) || 1
-                ) * 1000;
-
-            verificationTimer = setTimeout(
-                executeVerification,
-                interval
+                ) * 1000
             );
         };
 
@@ -2332,10 +2425,7 @@ ORDER BY tran_elapsed_time_seconds DESC;`;
 
             sqlInput.value = montarSqlMonitor(environments);
 
-            setStatus(
-                "Consultando bancos...",
-                "loading"
-            );
+            setStatus("Consultando bancos...", "loading");
 
             try {
                 const response = await fetch(
@@ -2351,14 +2441,10 @@ ORDER BY tran_elapsed_time_seconds DESC;`;
                 );
 
                 if (!response.ok) {
-                    throw new Error(
-                        `HTTP ${response.status}`
-                    );
+                    throw new Error(`HTTP ${response.status}`);
                 }
 
-                const html = await response.text();
-
-                updateResults(html);
+                updateResults(await response.text());
 
                 setStatus(
                     `Atualizado às ${new Date().toLocaleTimeString()}`
@@ -2381,6 +2467,25 @@ ORDER BY tran_elapsed_time_seconds DESC;`;
                 }
             }
         };
+
+        form.addEventListener("submit", event => {
+            const validation = validarSql(sqlInput.value);
+
+            showValidation(validation);
+
+            if (!validation.valid) {
+                event.preventDefault();
+                setStatus("SQL bloqueado", "error");
+                return;
+            }
+
+            if (validation.warnings.length) {
+                setStatus(
+                    "SQL válido com alertas",
+                    "warning"
+                );
+            }
+        });
 
         verifyButton.onclick = () => {
             if (isVerificationActive()) {
