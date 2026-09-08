@@ -10,10 +10,10 @@
         JOB_SUMMARY_REGEX: /Total de processos iniciados|Tempo total/i,
         STYLES: {
             levels: {
-                ERROR: {bg: '#ffebee', color: '#c62828'},
-                WARN: {bg: '#fff3e0', color: '#ef6c00'},
-                INFO: {bg: '#e3f2fd', color: '#1976d2'},
-                DEBUG: {bg: '#f5f5f5', color: '#424242'}
+                ERROR: { bg: '#ffebee', color: '#c62828' },
+                WARN: { bg: '#fff3e0', color: '#ef6c00' },
+                INFO: { bg: '#e3f2fd', color: '#1976d2' },
+                DEBUG: { bg: '#f5f5f5', color: '#424242' }
             },
             hover: '#e0e0e0',
             cardColors: {
@@ -36,7 +36,7 @@
     let lastErrorTime = null;
     let lastErrorText = '';
 
-    const globalCounts = {TOTAL: 0, ERROR: 0, WARN: 0, INFO: 0, DEBUG: 0};
+    const globalCounts = { TOTAL: 0, ERROR: 0, WARN: 0, INFO: 0, DEBUG: 0 };
     const threadHeat = Object.create(null);
     const errorPatterns = Object.create(null);
     const errorDeltas = [];
@@ -147,15 +147,15 @@
 
     // Atalhos de teclado
     const keyListDefault = [
-        {name: "Salvar Modelagem", className: "icon-save-bpm", key: "s"},
-        {name: "Validar Modelagem", className: "icon-validate-bpm", key: "v"},
-        {name: "Publicar Modelagem", className: "icon-deploy-bpm", key: "l"},
-        {name: "Central", link: "adm/central.jsp", key: "¹"},
-        {name: "Form Tree", link: "adm/dumpEForm.jsp", key: "²"},
-        {name: "SQL", link: "adm/sql.jsp", key: "³"},
-        {name: "Script", link: "adm/script.jsp", key: "£"},
-        {name: "Log", link: "adm/log.jsp", key: "¢"},
-        {name: "TomCatLog", link: "adm/tomcatLog.jsp", key: "¬"}
+        { name: "Salvar Modelagem", className: "icon-save-bpm", key: "s" },
+        { name: "Validar Modelagem", className: "icon-validate-bpm", key: "v" },
+        { name: "Publicar Modelagem", className: "icon-deploy-bpm", key: "l" },
+        { name: "Central", link: "adm/central.jsp", key: "¹" },
+        { name: "Form Tree", link: "adm/dumpEForm.jsp", key: "²" },
+        { name: "SQL", link: "adm/sql.jsp", key: "³" },
+        { name: "Script", link: "adm/script.jsp", key: "£" },
+        { name: "Log", link: "adm/log.jsp", key: "¢" },
+        { name: "TomCatLog", link: "adm/tomcatLog.jsp", key: "¬" }
     ];
 
     const salvarKeysDefault = () => {
@@ -545,10 +545,10 @@
             /* ================= CONFIG ================= */
             const styles = {
                 levels: {
-                    ERROR: {bg: '#ffebee', color: '#c62828'},
-                    WARN: {bg: '#fff3e0', color: '#ef6c00'},
-                    INFO: {bg: '#e3f2fd', color: '#1976d2'},
-                    DEBUG: {bg: '#f5f5f5', color: '#424242'}
+                    ERROR: { bg: '#ffebee', color: '#c62828' },
+                    WARN: { bg: '#fff3e0', color: '#ef6c00' },
+                    INFO: { bg: '#e3f2fd', color: '#1976d2' },
+                    DEBUG: { bg: '#f5f5f5', color: '#424242' }
                 },
                 hover: '#e0e0e0',
                 cardColors: {
@@ -582,10 +582,10 @@
             };
 
             const highlightPresets = [
-                {id: 'amber', label: 'Amarelo / Marrom', bg: '#ffeb3b', color: '#3e2723'},
-                {id: 'cyan', label: 'Ciano / Verde Escuro', bg: '#00bcd4', color: '#fff'},
-                {id: 'mage', label: 'Rosa / Roxo', bg: '#e91e63', color: '#fff'},
-                {id: 'lime', label: 'Lima / Verde', bg: '#8bc34a', color: '#fff'}
+                { id: 'amber', label: 'Amarelo / Marrom', bg: '#ffeb3b', color: '#3e2723' },
+                { id: 'cyan', label: 'Ciano / Verde Escuro', bg: '#00bcd4', color: '#fff' },
+                { id: 'mage', label: 'Rosa / Roxo', bg: '#e91e63', color: '#fff' },
+                { id: 'lime', label: 'Lima / Verde', bg: '#8bc34a', color: '#fff' }
             ];
             const highlightStorageKey = 'fusion-log-highlights-list';
             const highlightHistoryKey = 'fusion-log-highlights-history';
@@ -698,7 +698,7 @@
                     });
                     highlightHistoryDropdownEl.appendChild(item);
                 });
-                
+
                 const clearBtn = document.createElement('div');
                 clearBtn.style.cssText = `
                     padding:8px 12px;background:#fafafa;border-top:1px solid #eee;
@@ -804,7 +804,7 @@
                 const phrase = highlightInputEl.value.trim();
                 if (!phrase) return;
                 const presetId = highlightPresetEl.value;
-                highlightsList.push({phrase, presetId});
+                highlightsList.push({ phrase, presetId });
                 addToHistory(phrase);
                 persistHighlights();
                 highlightInputEl.value = '';
@@ -955,14 +955,14 @@
             `;
                 container.before(c);
                 console.log('%cFusion Cards Container criado', 'color:#1976d2;font-weight:bold');
-                
+
                 const cardsRow = document.createElement('div');
                 cardsRow.id = 'log-stats-cards-row';
                 cardsRow.style.cssText = `
                 display:flex;gap:12px;padding:12px;background:#f1f3f5;
             `;
                 c.appendChild(cardsRow);
-                
+
                 createHighlightControls(c);
             }
 
@@ -1243,7 +1243,7 @@
                 applyHighlightsToAllLines();
             }
 
-            new MutationObserver(updateAll).observe(container, {childList: true});
+            new MutationObserver(updateAll).observe(container, { childList: true });
 
             if (!document.getElementById('fusion-log-utils')) {
                 const css = document.createElement('style');
@@ -1369,6 +1369,710 @@
         })();
     }
 
+    // ================= MONITOR SQL =================
+
+    const SQL_ACTIVE_KEY = "fusion-sql-monitor-active";
+    const SQL_ENVIRONMENTS_KEY = "fusion-sql-environments";
+    const SQL_SETTINGS_KEY = "fusion-sql-settings";
+
+    const SQL_DEFAULT_ENVIRONMENTS = [
+        { id: 5, label: "Produção" },
+        { id: 6, label: "Homologação" }
+    ];
+
+    const SQL_DEFAULT_SETTINGS = {
+        intervalSeconds: 1
+    };
+
+    const lerStorage = (key, fallback) => {
+        try {
+            const value = localStorage.getItem(key);
+            return value ? JSON.parse(value) : fallback;
+        } catch (error) {
+            console.error("Erro ao ler configuração:", error);
+            return fallback;
+        }
+    };
+
+    const salvarStorage = (key, value) => {
+        localStorage.setItem(key, JSON.stringify(value));
+    };
+
+    const montarSqlMonitor = environments => {
+        const configuredEnvironments = Array.isArray(environments)
+            ? environments.filter(environment =>
+                Number.isInteger(Number(environment.id)) &&
+                Number(environment.id) >= 0 &&
+                String(environment.label || "").trim()
+            )
+            : [];
+
+        const ambienteSelect = configuredEnvironments.length === 0
+            ? "    sess.database_id AS ambiente,"
+            : `    CASE
+${configuredEnvironments.map(environment => {
+                const id = Number(environment.id);
+                const label = String(environment.label)
+                    .trim()
+                    .replace(/'/g, "''");
+
+                return `        WHEN sess.database_id = ${id} THEN '${label}'`;
+            }).join("\n")}
+        ELSE CAST(sess.database_id AS VARCHAR(20))
+    END AS ambiente,`;
+
+        return `SELECT
+    sess.status,
+${ambienteSelect}
+    COUNT(*) OVER () AS total_records,
+    GETDATE() AS now,
+    DATEDIFF(
+        SECOND,
+        at.transaction_begin_time,
+        GETDATE()
+    ) AS tran_elapsed_time_seconds,
+    DATEDIFF(
+        MINUTE,
+        at.transaction_begin_time,
+        GETDATE()
+    ) AS tran_elapsed_time_minutes,
+    st.session_id,
+    txt.text,
+    *
+FROM sys.dm_tran_active_transactions at
+INNER JOIN sys.dm_tran_session_transactions st
+    ON st.transaction_id = at.transaction_id
+LEFT OUTER JOIN sys.dm_exec_sessions sess
+    ON st.session_id = sess.session_id
+LEFT OUTER JOIN sys.dm_exec_connections conn
+    ON conn.session_id = sess.session_id
+OUTER APPLY sys.dm_exec_sql_text(
+    conn.most_recent_sql_handle
+) AS txt
+ORDER BY tran_elapsed_time_seconds DESC;`;
+    };
+
+    const inserirMonitorSql = () => {
+        if (!location.pathname.endsWith("/fusion/adm/sql.jsp")) {
+            return;
+        }
+
+        if (document.getElementById("fusion-sql-monitor")) {
+            return;
+        }
+
+        const form = document.querySelector("form");
+
+        if (!form) {
+            return;
+        }
+
+        const maxInput = form.querySelector('input[name="max"]');
+        const sqlInput = form.querySelector('textarea[name="sql"]');
+
+        if (!maxInput || !sqlInput) {
+            return;
+        }
+
+        let resultTable =
+            document.getElementById("resultTable");
+
+        let resultsWrapper =
+            document.getElementById("fusion-sql-results");
+
+        let environments = lerStorage(
+            SQL_ENVIRONMENTS_KEY,
+            SQL_DEFAULT_ENVIRONMENTS
+        );
+
+        let settings = lerStorage(
+            SQL_SETTINGS_KEY,
+            SQL_DEFAULT_SETTINGS
+        );
+
+        let verificationTimer = null;
+        let requestInProgress = false;
+
+        const style = document.createElement("style");
+        style.id = "fusion-sql-monitor-style";
+
+        style.textContent = `
+        #fusion-sql-monitor-shell {
+            margin: 24px auto;
+            padding: 0 12px;
+            font-family: Arial, sans-serif;
+        }
+
+        #fusion-sql-monitor-toolbar {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-bottom: 14px;
+        }
+
+        #fusion-sql-monitor {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        #fusion-sql-monitor button,
+        #fusion-sql-monitor-panel button {
+            padding: 8px 14px;
+            border: 0;
+            border-radius: 5px;
+            background: #1976d2;
+            color: #fff;
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        #fusion-sql-monitor button:hover,
+        #fusion-sql-monitor-panel button:hover {
+            background: #125ca1;
+        }
+
+        #fusion-sql-monitor button.active {
+            background: #c62828;
+        }
+
+        #fusion-sql-monitor-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            color: #546e7a;
+            font-size: 12px;
+        }
+
+        #fusion-sql-monitor-status.loading {
+            color: #1976d2;
+        }
+
+        #fusion-sql-monitor-status.error {
+            color: #c62828;
+        }
+
+        #fusion-sql-monitor-panel {
+            display: none;
+            margin-bottom: 16px;
+            padding: 16px;
+            border: 1px solid #d7dde3;
+            border-radius: 7px;
+            background: #f8fafc;
+        }
+
+        #fusion-sql-monitor-panel.visible {
+            display: block;
+        }
+
+        .fusion-sql-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin: 8px 0;
+        }
+
+        .fusion-sql-row input {
+            padding: 7px 8px;
+            border: 1px solid #c7ced6;
+            border-radius: 4px;
+        }
+
+        #fusion-sql-monitor-panel > button {
+            margin-top: 8px;
+        }
+
+        #fusion-sql-monitor-panel > button + button {
+            margin-left: 8px;
+        }
+
+        .fusion-sql-remove {
+            border: 1px solid #c62828 !important;
+            background: #fff !important;
+            color: #c62828 !important;
+        }
+
+        .fusion-sql-remove:hover {
+            background: #ffebee !important;
+        }
+
+        #fusion-sql-form-wrapper {
+            width: fit-content;
+            max-width: calc(100% - 52px);
+            margin: 0 0 24px;
+            padding: 22px 26px;
+            background: #fff;
+            border: 1px solid #dfe3e8;
+            border-radius: 10px;
+            box-shadow: 0 3px 14px rgba(0,0,0,.08);
+        }
+
+        #fusion-sql-form-wrapper textarea[name="sql"] {
+            display: block;
+            width: 100%;
+            min-height: 300px;
+            box-sizing: border-box;
+            margin: 18px 0;
+            padding: 14px;
+            border: 1px solid #c7ced6;
+            border-radius: 7px;
+            background: #17212b;
+            color: #e8f1f8;
+            font: 13px/1.5 Consolas, "Courier New", monospace;
+            resize: vertical;
+        }
+
+        #fusion-sql-results {
+            margin: 0 auto;
+            overflow-x: auto;
+        }
+
+        #fusion-sql-results table {
+            min-width: 100%;
+            border-collapse: collapse;
+            white-space: nowrap;
+        }
+
+        #fusion-sql-results th {
+            position: sticky;
+            top: 0;
+            z-index: 2;
+            background: #263238;
+            color: #fff;
+        }
+
+        #fusion-sql-results th,
+        #fusion-sql-results td {
+            padding: 6px;
+            border: 1px solid #dfe3e8;
+        }
+
+        .fusion-sql-empty {
+            padding: 16px;
+            color: #607d8b;
+            background: #f8fafc;
+            border: 1px solid #dfe3e8;
+            border-radius: 7px;
+        }
+        
+        #fusion-sql-clear-button {
+            margin: 0 0 12px 0px;
+            padding: 5px 7px;
+            border: 0;
+            border-radius: 5px;
+            background: #dc0000;
+            color: #fff;
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        #fusion-sql-clear-button:hover {
+            background: #455a64;
+        }
+    `;
+
+        document.head.appendChild(style);
+
+        /*
+         * Cria o container de resultados mesmo quando a página
+         * ainda não possui uma tabela.
+         */
+        if (!resultsWrapper) {
+            resultsWrapper = document.createElement("div");
+            resultsWrapper.id = "fusion-sql-results";
+
+            if (resultTable) {
+                resultTable.parentNode.insertBefore(
+                    resultsWrapper,
+                    resultTable
+                );
+
+                resultsWrapper.appendChild(resultTable);
+            } else {
+                form.parentNode.insertBefore(
+                    resultsWrapper,
+                    form.nextSibling
+                );
+            }
+        } else if (
+            resultTable &&
+            !resultsWrapper.contains(resultTable)
+        ) {
+            resultsWrapper.appendChild(resultTable);
+        }
+
+        const shell = document.createElement("div");
+        shell.id = "fusion-sql-monitor-shell";
+
+        const toolbar = document.createElement("div");
+        toolbar.id = "fusion-sql-monitor-toolbar";
+
+        const monitorWrapper = document.createElement("span");
+        monitorWrapper.id = "fusion-sql-monitor";
+
+        const verifyButton = document.createElement("button");
+        verifyButton.type = "button";
+
+        const configureButton = document.createElement("button");
+        configureButton.type = "button";
+        configureButton.textContent = "Configurar";
+
+        const status = document.createElement("span");
+        status.id = "fusion-sql-monitor-status";
+
+        monitorWrapper.append(
+            verifyButton,
+            configureButton
+        );
+
+        toolbar.append(
+            monitorWrapper,
+            status
+        );
+
+        const panel = document.createElement("div");
+        panel.id = "fusion-sql-monitor-panel";
+
+        const intervalRow = document.createElement("div");
+        intervalRow.className = "fusion-sql-row";
+
+        const intervalLabel = document.createElement("label");
+        intervalLabel.textContent =
+            "Intervalo entre consultas (segundos):";
+
+        const intervalInput = document.createElement("input");
+        intervalInput.type = "number";
+        intervalInput.min = "0.1";
+        intervalInput.step = "0.1";
+        intervalInput.value =
+            Number(settings.intervalSeconds) || 1;
+        intervalInput.style.width = "70px";
+
+        intervalRow.append(
+            intervalLabel,
+            intervalInput
+        );
+
+        const environmentsContainer =
+            document.createElement("div");
+
+        const addButton = document.createElement("button");
+        addButton.type = "button";
+        addButton.textContent = "Adicionar ambiente";
+
+        const saveButton = document.createElement("button");
+        saveButton.type = "button";
+        saveButton.textContent = "Salvar";
+
+        panel.append(
+            intervalRow,
+            environmentsContainer,
+            addButton,
+            saveButton
+        );
+
+        shell.append(
+            toolbar,
+            panel
+        );
+
+        form.parentNode.insertBefore(shell, form);
+        form.id = "fusion-sql-form-wrapper";
+
+        const setStatus = (message, type = "") => {
+            status.textContent = message;
+            status.className = type;
+        };
+
+        const renderEnvironments = () => {
+            environmentsContainer.innerHTML = "";
+
+            environments.forEach((environment, index) => {
+                const row = document.createElement("div");
+                row.className = "fusion-sql-row";
+
+                const idInput = document.createElement("input");
+                idInput.type = "number";
+                idInput.min = "0";
+                idInput.value = environment.id;
+                idInput.placeholder = "database_id";
+
+                const labelInput = document.createElement("input");
+                labelInput.type = "text";
+                labelInput.value = environment.label;
+                labelInput.placeholder = "Nome do ambiente";
+
+                const removeButton = document.createElement("button");
+                removeButton.type = "button";
+                removeButton.className = "fusion-sql-remove";
+                removeButton.textContent = "Remover";
+
+                removeButton.onclick = () => {
+                    environments.splice(index, 1);
+                    renderEnvironments();
+                };
+
+                row.append(
+                    document.createTextNode("ID "),
+                    idInput,
+                    document.createTextNode(" Nome "),
+                    labelInput,
+                    removeButton
+                );
+
+                row.idInput = idInput;
+                row.labelInput = labelInput;
+
+                environmentsContainer.appendChild(row);
+            });
+        };
+
+        const collectEnvironments = () => {
+            return [...environmentsContainer.children]
+                .map(row => ({
+                    id: Number(row.idInput.value),
+                    label: row.labelInput.value.trim()
+                }))
+                .filter(environment =>
+                    Number.isInteger(environment.id) &&
+                    environment.id >= 0 &&
+                    environment.label
+                );
+        };
+
+        const saveCurrentSettings = () => {
+            const currentEnvironments =
+                collectEnvironments();
+
+            environments = currentEnvironments;
+
+            settings = {
+                intervalSeconds: Math.max(
+                    0.1,
+                    Number(intervalInput.value) || 1
+                )
+            };
+
+            salvarStorage(
+                SQL_ENVIRONMENTS_KEY,
+                environments
+            );
+
+            salvarStorage(
+                SQL_SETTINGS_KEY,
+                settings
+            );
+        };
+
+        const isVerificationActive = () =>
+            localStorage.getItem(SQL_ACTIVE_KEY) === "true";
+
+        const setVerificationActive = active => {
+            localStorage.setItem(
+                SQL_ACTIVE_KEY,
+                String(active)
+            );
+        };
+
+        const updateVerificationButton = () => {
+            const active = isVerificationActive();
+
+            verifyButton.textContent = active
+                ? "Interromper verificação"
+                : "Verificar transações";
+
+            verifyButton.classList.toggle(
+                "active",
+                active
+            );
+
+            if (!document.getElementById("fusion-sql-clear-button")) {
+                const clearSqlButton = document.createElement("button");
+
+                clearSqlButton.id = "fusion-sql-clear-button";
+                clearSqlButton.type = "button";
+                clearSqlButton.textContent = "Limpar SQL";
+
+                clearSqlButton.onclick = () => {
+                    sqlInput.value = "";
+
+                    sqlInput.dispatchEvent(
+                        new Event("input", { bubbles: true })
+                    );
+
+                    sqlInput.dispatchEvent(
+                        new Event("change", { bubbles: true })
+                    );
+
+                    sqlInput.focus();
+                };
+
+                sqlInput.insertAdjacentElement(
+                    "afterend",
+                    clearSqlButton
+                );
+            }
+        };
+
+        const updateResults = html => {
+            const parser = new DOMParser();
+
+            const responseDocument = parser.parseFromString(
+                html,
+                "text/html"
+            );
+
+            const newResultTable =
+                responseDocument.querySelector("#resultTable");
+
+            if (!newResultTable) {
+                resultTable = null;
+
+                resultsWrapper.innerHTML = `
+                <div class="fusion-sql-empty">
+                    Nenhum resultado retornado.
+                </div>
+            `;
+
+                return;
+            }
+
+            resultsWrapper.innerHTML = "";
+            resultTable = newResultTable;
+            resultsWrapper.appendChild(resultTable);
+        };
+
+        const scheduleNextVerification = () => {
+            clearTimeout(verificationTimer);
+
+            if (!isVerificationActive()) {
+                return;
+            }
+
+            const interval =
+                Math.max(
+                    0.1,
+                    Number(settings.intervalSeconds) || 1
+                ) * 1000;
+
+            verificationTimer = setTimeout(
+                executeVerification,
+                interval
+            );
+        };
+
+        const executeVerification = async () => {
+            if (
+                !isVerificationActive() ||
+                requestInProgress
+            ) {
+                return;
+            }
+
+            requestInProgress = true;
+            clearTimeout(verificationTimer);
+
+            saveCurrentSettings();
+
+            sqlInput.value = montarSqlMonitor(environments);
+
+            setStatus(
+                "Consultando bancos...",
+                "loading"
+            );
+
+            try {
+                const response = await fetch(
+                    form.action || window.location.href,
+                    {
+                        method: "POST",
+                        credentials: "same-origin",
+                        body: new FormData(form),
+                        headers: {
+                            "X-Requested-With": "XMLHttpRequest"
+                        }
+                    }
+                );
+
+                if (!response.ok) {
+                    throw new Error(
+                        `HTTP ${response.status}`
+                    );
+                }
+
+                const html = await response.text();
+
+                updateResults(html);
+
+                setStatus(
+                    `Atualizado às ${new Date().toLocaleTimeString()}`
+                );
+            } catch (error) {
+                console.error(
+                    "Erro ao atualizar consulta SQL:",
+                    error
+                );
+
+                setStatus(
+                    `Erro: ${error.message}`,
+                    "error"
+                );
+            } finally {
+                requestInProgress = false;
+
+                if (isVerificationActive()) {
+                    scheduleNextVerification();
+                }
+            }
+        };
+
+        verifyButton.onclick = () => {
+            if (isVerificationActive()) {
+                clearTimeout(verificationTimer);
+                verificationTimer = null;
+                setVerificationActive(false);
+                setStatus("Monitor interrompido");
+                updateVerificationButton();
+                return;
+            }
+
+            saveCurrentSettings();
+            setVerificationActive(true);
+            setStatus("Monitor ativo");
+            updateVerificationButton();
+            scheduleNextVerification();
+        };
+
+        configureButton.onclick = () => {
+            panel.classList.toggle("visible");
+            renderEnvironments();
+        };
+
+        addButton.onclick = () => {
+            environments.push({
+                id: "",
+                label: ""
+            });
+
+            renderEnvironments();
+        };
+
+        saveButton.onclick = () => {
+            saveCurrentSettings();
+            panel.classList.remove("visible");
+            setStatus("Configurações salvas");
+        };
+
+        renderEnvironments();
+        updateVerificationButton();
+
+        if (isVerificationActive()) {
+            setStatus("Monitor ativo");
+            scheduleNextVerification();
+        }
+    };
+
     // ================= INICIALIZAÇÃO =================
     const init = () => {
         // Carregar Font Awesome
@@ -1395,12 +2099,14 @@
             ajustarEstilosRelatorio();
             alinharCamposModelagem();
             criarBotaoAtualizar();
+            inserirMonitorSql();
         }, 500);
 
         criarBotaoDump();
         criarMenuFlutuante();
         salvarKeysDefault();
         aplicarAtalhos();
+        inserirMonitorSql();
 
         if (location.href.includes("adm/mem.jsp")) {
             insertStyleMemReport();
