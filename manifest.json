@@ -19,7 +19,7 @@
     }
   ],
   "action": {
-    "default_title": "Fusion DEV",
+    "default_title": "Fusion DEV - LOCAL",
     "default_popup": "popup.html"
   }
 }

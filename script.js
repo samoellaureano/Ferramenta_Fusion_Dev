@@ -1530,6 +1530,30 @@
         localStorage.setItem(key, JSON.stringify(value));
     };
 
+    if (!document.documentElement.dataset.fusionCtrlEnter) {
+        document.documentElement.dataset.fusionCtrlEnter = "true";
+
+        document.addEventListener("keydown", event => {
+            if (
+                event.ctrlKey &&
+                event.key === "Enter" &&
+                !event.altKey &&
+                !event.shiftKey
+            ) {
+                event.preventDefault();
+                event.stopPropagation();
+
+                const button = document.querySelector(
+                    ".fusion-sql-execute-button"
+                );
+
+                if (button && !button.disabled) {
+                    button.click();
+                }
+            }
+        }, true);
+    }
+
     const removerComentariosSql = sql =>
         sql
             .replace(/\/\*[\s\S]*?\*\//g, " ")
@@ -1636,12 +1660,6 @@
                     );
                 }
             }
-        }
-
-        if (/\bSELECT\s+\*/i.test(withoutComments)) {
-            warnings.push(
-                "Prefira informar as colunas em vez de usar SELECT *."
-            );
         }
 
         if (/\bUPDATE\b/i.test(withoutComments)) {
@@ -1938,17 +1956,6 @@ ORDER BY tran_elapsed_time_seconds DESC;`;
             border: 1px solid #dfe3e8;
             border-radius: 7px;
         }
-        
-        #fusion-sql-clear-button {
-            margin: 0 0 12px 0px;
-            padding: 5px 7px;
-            border: 0;
-            border-radius: 5px;
-            background: #dc0000;
-            color: #fff;
-            cursor: pointer;
-            font-weight: 600;
-        }
 
         #fusion-sql-clear-button:hover {
             background: #455a64;
@@ -2067,7 +2074,7 @@ ORDER BY tran_elapsed_time_seconds DESC;`;
 
         .fusion-sql-execute-button {
             min-width: 100px;
-            margin-top: 8px;
+            margin-top: -20px;
             padding: 9px 18px !important;
             border: 0 !important;
             border-radius: 6px !important;
@@ -2082,7 +2089,8 @@ ORDER BY tran_elapsed_time_seconds DESC;`;
         }
 
         #fusion-sql-clear-button {
-            margin: 0 0 12px;
+            display: block;
+            margin-top: 10px;
             padding: 6px 10px;
             border: 0;
             border-radius: 5px;
@@ -2090,6 +2098,14 @@ ORDER BY tran_elapsed_time_seconds DESC;`;
             color: #fff;
             cursor: pointer;
             font-weight: 600;
+        }
+
+        .fusion-sql-execute-hint {
+            display: inline-block;
+            margin: 10px 0 0 0;
+            color: #607d8b;
+            font: 12px Arial, sans-serif;
+            vertical-align: middle;
         }
     `;
 
@@ -2372,6 +2388,15 @@ ORDER BY tran_elapsed_time_seconds DESC;`;
             resultsWrapper.appendChild(resultTable);
         };
 
+        const executeHint = document.createElement("span");
+        executeHint.textContent = "Ctrl+Enter para executar";
+        executeHint.className = "fusion-sql-execute-hint";
+
+        executeButton.insertAdjacentElement(
+            "afterend",
+            executeHint
+        );
+
         const clearButton = document.createElement("button");
         clearButton.id = "fusion-sql-clear-button";
         clearButton.type = "button";
@@ -2386,7 +2411,7 @@ ORDER BY tran_elapsed_time_seconds DESC;`;
             messageBox.innerHTML = "";
         };
 
-        sqlInput.insertAdjacentElement(
+        executeButton.insertAdjacentElement(
             "afterend",
             clearButton
         );
