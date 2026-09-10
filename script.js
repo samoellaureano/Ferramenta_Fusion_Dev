@@ -2435,22 +2435,15 @@ ORDER BY tran_elapsed_time_seconds DESC;`;
             );
         };
 
-        const executeVerification = async () => {
-            if (
-                !isVerificationActive() ||
-                requestInProgress
-            ) {
+        const executeSqlRequest = async sql => {
+            if (requestInProgress) {
+                setStatus("Já existe uma consulta em andamento", "warning");
                 return;
             }
 
             requestInProgress = true;
-            clearTimeout(verificationTimer);
-
-            saveCurrentSettings();
-
-            sqlInput.value = montarSqlMonitor(environments);
-
-            setStatus("Consultando bancos...", "loading");
+            sqlInput.value = sql;
+            setStatus("Executando consulta...", "loading");
 
             try {
                 const response = await fetch(
@@ -2470,23 +2463,36 @@ ORDER BY tran_elapsed_time_seconds DESC;`;
                 }
 
                 updateResults(await response.text());
-
                 setStatus(
                     `Atualizado às ${new Date().toLocaleTimeString()}`
                 );
             } catch (error) {
-                console.error(
-                    "Erro ao atualizar consulta SQL:",
-                    error
-                );
-
-                setStatus(
-                    `Erro: ${error.message}`,
-                    "error"
-                );
+                console.error("Erro ao executar consulta SQL:", error);
+                setStatus(`Erro: ${error.message}`, "error");
             } finally {
                 requestInProgress = false;
+            }
+        };
 
+        const executeVerification = async () => {
+            if (!isVerificationActive()) {
+                return;
+            }
+
+            if (requestInProgress) {
+                scheduleNextVerification();
+                return;
+            }
+
+            clearTimeout(verificationTimer);
+
+            saveCurrentSettings();
+
+            sqlInput.value = montarSqlMonitor(environments);
+
+            try {
+                await executeSqlRequest(sqlInput.value);
+            } finally {
                 if (isVerificationActive()) {
                     scheduleNextVerification();
                 }
@@ -2494,12 +2500,13 @@ ORDER BY tran_elapsed_time_seconds DESC;`;
         };
 
         form.addEventListener("submit", event => {
+            event.preventDefault();
+
             const validation = validarSql(sqlInput.value);
 
             showValidation(validation);
 
             if (!validation.valid) {
-                event.preventDefault();
                 setStatus("SQL bloqueado", "error");
                 return;
             }
@@ -2510,6 +2517,8 @@ ORDER BY tran_elapsed_time_seconds DESC;`;
                     "warning"
                 );
             }
+
+            executeSqlRequest(sqlInput.value);
         });
 
         verifyButton.onclick = () => {
