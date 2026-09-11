@@ -2,10 +2,22 @@
   "name": "Ferramenta Fusion DEV",
   "version": "1.23",
   "manifest_version": 3,
+  "permissions": [
+    "storage"
+  ],
   "icons": {
     "128": "icon.png"
   },
   "content_scripts": [
+    {
+      "matches": [
+        "*://*/fusion/*"
+      ],
+      "run_at": "document_start",
+      "js": [
+        "fusion-compat.js"
+      ]
+    },
     {
       "matches": [
         "*://*/fusion/*"

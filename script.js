@@ -1571,6 +1571,10 @@
     const SQL_ACTIVE_KEY = "fusion-sql-monitor-active";
     const SQL_ENVIRONMENTS_KEY = "fusion-sql-environments";
     const SQL_SETTINGS_KEY = "fusion-sql-settings";
+    const SQL_HISTORY_KEY = "fusion-sql-history";
+
+    const paginaSql = () =>
+        window.location.pathname.endsWith("/fusion/adm/sql.jsp");
 
     const SQL_DEFAULT_ENVIRONMENTS = [
         { id: 5, label: "Produção" },
@@ -1609,6 +1613,37 @@ ORDER BY TABLE_NAME, ORDINAL_POSITION;`;
 
     const salvarStorage = (key, value) => {
         localStorage.setItem(key, JSON.stringify(value));
+    };
+
+    const extensaoStorageDisponivel = () =>
+        typeof chrome !== "undefined" &&
+        chrome.storage &&
+        chrome.storage.local;
+
+    const lerHistoricoCompartilhado = async fallback => {
+        if (!extensaoStorageDisponivel()) return fallback;
+
+        try {
+            const stored = await chrome.storage.local.get(SQL_HISTORY_KEY);
+            const history = stored[SQL_HISTORY_KEY];
+            return Array.isArray(history) ? history : fallback;
+        } catch (error) {
+            console.debug("Não foi possível ler o histórico compartilhado:", error);
+            return fallback;
+        }
+    };
+
+    const salvarHistoricoCompartilhado = async history => {
+        salvarStorage(SQL_HISTORY_KEY, history);
+        if (!extensaoStorageDisponivel()) return;
+
+        try {
+            await chrome.storage.local.set({
+                [SQL_HISTORY_KEY]: history
+            });
+        } catch (error) {
+            console.debug("Não foi possível salvar o histórico compartilhado:", error);
+        }
     };
 
     if (!document.documentElement.dataset.fusionCtrlEnter) {
@@ -1822,11 +1857,7 @@ ORDER BY tran_elapsed_time_seconds DESC;`;
             return;
         }
 
-        if (
-            !window.location.pathname.endsWith(
-                "/fusion/adm/sql.jsp"
-            )
-        ) {
+        if (!paginaSql()) {
             return;
         }
 
@@ -1963,14 +1994,43 @@ ORDER BY tran_elapsed_time_seconds DESC;`;
         }
 
         #fusion-sql-form-wrapper {
-            width: fit-content;
-            max-width: calc(100% - 52px);
+            width: 100%;
+            max-width: 100%;
+            box-sizing: border-box;
             margin: 0 0 24px;
             padding: 22px 26px;
             background: #fff;
             border: 1px solid #dfe3e8;
             border-radius: 10px;
             box-shadow: 0 3px 14px rgba(0,0,0,.08);
+            color: #405661;
+            font: 13px/1.5 Arial, sans-serif;
+        }
+
+        #fusion-sql-form-wrapper select,
+        #fusion-sql-form-wrapper input[name="max"] {
+            box-sizing: border-box;
+            min-height: 32px;
+            margin: 0 5px;
+            padding: 6px 9px;
+            border: 1px solid #c5d3da;
+            border-radius: 5px;
+            background: #fff;
+            color: #263238;
+            font: 13px Arial, sans-serif;
+            vertical-align: middle;
+        }
+
+        #fusion-sql-form-wrapper select:focus,
+        #fusion-sql-form-wrapper input[name="max"]:focus {
+            border-color: #087f9b;
+            outline: 0;
+            box-shadow: 0 0 0 2px rgba(8,127,155,.12);
+        }
+
+        #fusion-sql-form-wrapper input[name="max"] {
+            width: 64px !important;
+            text-align: center;
         }
 
         #fusion-sql-form-wrapper textarea[name="sql"] {
@@ -1986,6 +2046,339 @@ ORDER BY tran_elapsed_time_seconds DESC;`;
             color: #e8f1f8;
             font: 13px/1.5 Consolas, "Courier New", monospace;
             resize: vertical;
+        }
+
+        #fusion-sql-editor-layout {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+            gap: 16px;
+            align-items: start;
+        }
+
+        #fusion-sql-history {
+            min-width: 0;
+            overflow: hidden;
+            border: 1px solid #d4e0e7;
+            border-radius: 10px;
+            background: #f7fafb;
+            box-shadow: 0 5px 16px rgba(20,35,45,.07);
+        }
+
+        #fusion-sql-history header {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 8px;
+            padding: 12px;
+            border-bottom: 1px solid #d7e0e6;
+            background: linear-gradient(135deg, #eef7f9, #f9fbfc);
+            color: #315461;
+            font: 700 12px Arial, sans-serif;
+        }
+
+        #fusion-sql-history-title {
+            display: flex;
+            align-items: center;
+            gap: 7px;
+        }
+
+        #fusion-sql-history-title::before {
+            content: "";
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: #087f9b;
+            box-shadow: 0 0 0 3px rgba(8,127,155,.12);
+        }
+
+        #fusion-sql-history-count {
+            color: #78909c;
+            font-weight: 600;
+        }
+
+        #fusion-sql-history-clear {
+            justify-self: end;
+            padding: 3px 7px;
+            border: 1px solid #c5d5dc;
+            border-radius: 4px;
+            background: #fff;
+            color: #607d8b;
+            cursor: pointer;
+            font: 600 10px Arial, sans-serif;
+        }
+
+        #fusion-sql-history-clear:hover {
+            border-color: #c62828;
+            background: #fff5f5;
+            color: #c62828;
+        }
+
+        #fusion-sql-history-search {
+            grid-column: 1 / -1;
+            width: 100%;
+            box-sizing: border-box;
+            padding: 8px 10px;
+            border: 1px solid #c8d6dc;
+            border-radius: 6px;
+            outline: 0;
+            background: #fff;
+            color: #263238;
+            font: 12px Arial, sans-serif;
+        }
+
+        #fusion-sql-history-search:focus {
+            border-color: #087f9b;
+            box-shadow: 0 0 0 2px rgba(8,127,155,.12);
+        }
+
+        #fusion-sql-history-list {
+            max-height: 360px;
+            overflow-y: auto;
+        }
+
+        .fusion-sql-history-empty {
+            padding: 18px 12px;
+            color: #78909c;
+            text-align: center;
+            font: 12px/1.4 Arial, sans-serif;
+        }
+
+        .fusion-sql-history-more {
+            display: block;
+            width: 100%;
+            box-sizing: border-box;
+            padding: 9px 12px;
+            border: 0;
+            border-top: 1px solid #dce7eb;
+            background: #eef7f9;
+            color: #087f9b;
+            cursor: pointer;
+            text-align: center;
+            font: 600 11px Arial, sans-serif;
+        }
+
+        .fusion-sql-history-more:hover,
+        .fusion-sql-history-more:focus-visible {
+            background: #dff1f4;
+            color: #075b70;
+            outline: 0;
+        }
+
+        #fusion-sql-history-modal {
+            position: fixed;
+            inset: 0;
+            z-index: 2147483646;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            background: rgba(13, 31, 40, .58);
+        }
+
+        #fusion-sql-history-dialog {
+            display: flex;
+            width: min(900px, 100%);
+            height: min(760px, 88vh);
+            max-height: 88vh;
+            flex-direction: column;
+            overflow: hidden;
+            border: 1px solid #cbdde4;
+            border-radius: 12px;
+            background: #fff;
+            box-shadow: 0 20px 60px rgba(13,31,40,.28);
+        }
+
+        #fusion-sql-history-dialog header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 14px;
+            padding: 16px 18px;
+            border-bottom: 1px solid #dce7eb;
+            background: #f3f9fa;
+            color: #164e63;
+            font: 700 15px Arial, sans-serif;
+        }
+
+        #fusion-sql-history-modal-search {
+            width: calc(100% - 36px);
+            box-sizing: border-box;
+            margin: 12px 18px;
+            flex: 0 0 auto;
+            padding: 10px 12px;
+            border: 1px solid #c8d6dc;
+            border-radius: 6px;
+            outline: 0;
+            font: 13px Arial, sans-serif;
+        }
+
+        #fusion-sql-history-modal-search:focus {
+            border-color: #087f9b;
+            box-shadow: 0 0 0 2px rgba(8,127,155,.12);
+        }
+
+        #fusion-sql-history-modal-list {
+            min-height: 0;
+            flex: 1 1 auto;
+            overflow: auto;
+            padding: 0 18px 18px;
+            scrollbar-width: thin;
+            scrollbar-color: #9db8c2 #eef5f7;
+        }
+
+        #fusion-sql-history-modal-list::-webkit-scrollbar {
+            width: 10px;
+        }
+
+        #fusion-sql-history-modal-list::-webkit-scrollbar-track {
+            background: #eef5f7;
+        }
+
+        #fusion-sql-history-modal-list::-webkit-scrollbar-thumb {
+            border: 2px solid #eef5f7;
+            border-radius: 8px;
+            background: #9db8c2;
+        }
+
+        .fusion-sql-history-modal-item {
+            display: grid;
+            grid-template-columns: 34px minmax(0, 1fr) 30px;
+            gap: 8px;
+            align-items: center;
+            padding: 8px 6px;
+            border-bottom: 1px solid #edf2f4;
+        }
+
+        .fusion-sql-history-modal-item:hover {
+            border-radius: 6px;
+            background: #f3f9fa;
+        }
+
+        .fusion-sql-history-modal-item .fusion-sql-history-load {
+            white-space: normal;
+            overflow-wrap: anywhere;
+        }
+
+        #fusion-sql-history-modal-close {
+            border: 0;
+            background: transparent;
+            color: #607d8b;
+            cursor: pointer;
+            font-size: 22px;
+            line-height: 1;
+        }
+
+        #fusion-sql-history-modal-close:hover {
+            color: #c62828;
+        }
+
+        @media (max-width: 700px) {
+            #fusion-sql-history-modal {
+                padding: 10px;
+            }
+
+            #fusion-sql-history-dialog {
+                height: 92vh;
+                max-height: 92vh;
+            }
+
+            #fusion-sql-history-modal-list {
+                padding: 0 10px 12px;
+            }
+        }
+
+        .fusion-sql-history-item {
+            display: grid;
+            grid-template-columns: 30px minmax(0, 1fr) 28px;
+            gap: 6px;
+            padding: 7px 9px;
+            border-bottom: 1px solid #e8eef1;
+        }
+
+        .fusion-sql-history-item:last-child {
+            border-bottom: 0;
+        }
+
+        .fusion-sql-history-item:hover {
+            background: #eef7f9;
+        }
+
+        .fusion-sql-history-load,
+        .fusion-sql-history-run {
+            min-width: 0;
+            border: 0;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .fusion-sql-history-load {
+            padding: 5px 4px;
+            background: transparent;
+            color: #36515e;
+            text-align: left;
+            font: 11px/1.35 Consolas, "Courier New", monospace;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .fusion-sql-history-load:hover {
+            color: #087f9b;
+            text-decoration: underline;
+        }
+
+        .fusion-sql-history-run {
+            align-self: center;
+            width: 30px;
+            height: 30px;
+            border: 1px solid #087f9b;
+            border-radius: 50%;
+            background: #087f9b;
+            color: #fff;
+            cursor: pointer;
+            font-size: 0;
+            box-shadow: 0 2px 5px rgba(8,127,155,.22);
+        }
+
+        .fusion-sql-history-run::before {
+            content: "";
+            display: inline-block;
+            margin-left: 2px;
+            border-top: 6px solid transparent;
+            border-bottom: 6px solid transparent;
+            border-left: 8px solid #fff;
+            vertical-align: middle;
+        }
+
+        .fusion-sql-history-run:hover {
+            background: #075b70;
+        }
+
+        .fusion-sql-history-delete {
+            align-self: center;
+            width: 26px;
+            height: 26px;
+            border: 0;
+            border-radius: 50%;
+            background: transparent;
+            color: #90a4ae;
+            cursor: pointer;
+            font-size: 15px;
+            line-height: 1;
+        }
+
+        .fusion-sql-history-delete:hover {
+            background: #fff0f0;
+            color: #c62828;
+        }
+
+        @media (max-width: 900px) {
+            #fusion-sql-editor-layout {
+                grid-template-columns: 1fr;
+            }
+
+            #fusion-sql-history-list {
+                max-height: 220px;
+            }
         }
 
         #fusion-sql-editor-wrapper {
@@ -2048,10 +2441,19 @@ ORDER BY tran_elapsed_time_seconds DESC;`;
         }
 
         #fusion-sql-results {
+            display: block;
+            width: 100%;
+            max-width: 100%;
+            min-width: 0;
+            box-sizing: border-box;
+            margin-top: 16px;
             overflow-x: auto;
+            overflow-y: hidden;
+            contain: inline-size;
         }
 
         #fusion-sql-results table {
+            width: max-content;
             min-width: 100%;
             border-collapse: collapse;
             white-space: nowrap;
@@ -2080,6 +2482,22 @@ ORDER BY tran_elapsed_time_seconds DESC;`;
         }
 
         #fusion-sql-clear-button:hover {
+            background: #455a64;
+        }
+
+        #fusion-sql-results-clear-button {
+            display: inline-block;
+            margin: 10px 0 0 8px;
+            padding: 6px 10px;
+            border: 0;
+            border-radius: 5px;
+            background: #607d8b;
+            color: #fff;
+            cursor: pointer;
+            font: 600 12px Arial, sans-serif;
+        }
+
+        #fusion-sql-results-clear-button:hover {
             background: #455a64;
         }
 
@@ -2361,10 +2779,27 @@ ORDER BY tran_elapsed_time_seconds DESC;`;
         form.parentNode.insertBefore(shell, form);
         form.id = "fusion-sql-form-wrapper";
 
+        const editorLayout = document.createElement("div");
+        editorLayout.id = "fusion-sql-editor-layout";
+        sqlInput.parentNode.insertBefore(editorLayout, sqlInput);
+
         const editorWrapper = document.createElement("div");
         editorWrapper.id = "fusion-sql-editor-wrapper";
-        sqlInput.parentNode.insertBefore(editorWrapper, sqlInput);
+        editorLayout.appendChild(editorWrapper);
         editorWrapper.appendChild(sqlInput);
+
+        const historyPanel = document.createElement("aside");
+        historyPanel.id = "fusion-sql-history";
+        historyPanel.innerHTML = `
+            <header>
+                <span id="fusion-sql-history-title">Histórico de scripts</span>
+                <span id="fusion-sql-history-count">0</span>
+                <button id="fusion-sql-history-clear" type="button" title="Remover todo o histórico">Limpar</button>
+                <input id="fusion-sql-history-search" type="search" placeholder="Buscar no histórico..." autocomplete="off">
+            </header>
+            <div id="fusion-sql-history-list"></div>
+        `;
+        editorLayout.appendChild(historyPanel);
 
         const tableSuggestions = document.createElement("div");
         tableSuggestions.id = "fusion-sql-table-suggestions";
@@ -2825,7 +3260,7 @@ ORDER BY tran_elapsed_time_seconds DESC;`;
 
         const messageBox = document.createElement("div");
         messageBox.id = "fusion-sql-validation-message";
-        form.insertBefore(messageBox, editorWrapper);
+        form.insertBefore(messageBox, editorLayout);
 
         const setStatus = (message, type = "") => {
             status.textContent = message;
@@ -3000,6 +3435,21 @@ ORDER BY tran_elapsed_time_seconds DESC;`;
             clearButton
         );
 
+        const clearResultsButton = document.createElement("button");
+        clearResultsButton.id = "fusion-sql-results-clear-button";
+        clearResultsButton.type = "button";
+        clearResultsButton.textContent = "Limpar resultado";
+        clearResultsButton.addEventListener("click", () => {
+            resultTable = null;
+            resultsWrapper.innerHTML = "";
+            setStatus("Resultado limpo");
+        });
+
+        resultsWrapper.parentNode.insertBefore(
+            clearResultsButton,
+            resultsWrapper
+        );
+
         let verificationTimer = null;
         let requestInProgress = false;
 
@@ -3019,7 +3469,224 @@ ORDER BY tran_elapsed_time_seconds DESC;`;
             );
         };
 
-        const executeSqlRequest = async sql => {
+        let sqlHistory = lerStorage(SQL_HISTORY_KEY, []);
+        if (!Array.isArray(sqlHistory)) sqlHistory = [];
+        sqlHistory = sqlHistory
+            .filter(sql => typeof sql === "string" && sql.trim())
+            .filter((sql, index, list) => list.indexOf(sql) === index);
+
+        const historyList = historyPanel.querySelector("#fusion-sql-history-list");
+        const historySearch = historyPanel.querySelector("#fusion-sql-history-search");
+        const historyCount = historyPanel.querySelector("#fusion-sql-history-count");
+        const historyClear = historyPanel.querySelector("#fusion-sql-history-clear");
+        const HISTORY_VISIBLE_LIMIT = 6;
+        let historyQuery = "";
+
+        const saveSqlHistory = () => {
+            salvarHistoricoCompartilhado(sqlHistory);
+        };
+
+        const addSqlHistory = sql => {
+            const normalizedSql = String(sql || "").trim();
+            if (!normalizedSql) return;
+
+            sqlHistory = [
+                normalizedSql,
+                ...sqlHistory.filter(item => item !== normalizedSql)
+            ];
+            saveSqlHistory();
+            renderSqlHistory();
+        };
+
+        const renderSqlHistory = () => {
+            historyList.innerHTML = "";
+            const matchingHistory = sqlHistory.filter(sql =>
+                !historyQuery || sql.toLowerCase().includes(historyQuery)
+            );
+            const visibleHistory = matchingHistory.slice(0, HISTORY_VISIBLE_LIMIT);
+            historyCount.textContent = `${visibleHistory.length}/${sqlHistory.length}`;
+
+            if (!visibleHistory.length) {
+                const empty = document.createElement("div");
+                empty.className = "fusion-sql-history-empty";
+                empty.textContent = sqlHistory.length
+                    ? "Nenhum script corresponde à busca."
+                    : "Nenhum script executado ainda.";
+                historyList.appendChild(empty);
+                return;
+            }
+
+            visibleHistory.forEach(sql => {
+                const item = document.createElement("div");
+                item.className = "fusion-sql-history-item";
+
+                const loadButton = document.createElement("button");
+                loadButton.type = "button";
+                loadButton.className = "fusion-sql-history-load";
+                loadButton.textContent = sql.replace(/\s+/g, " ");
+                loadButton.title = sql;
+                loadButton.addEventListener("click", () => {
+                    sqlInput.value = sql;
+                    sqlInput.dispatchEvent(new Event("input", { bubbles: true }));
+                    sqlInput.focus();
+                    setStatus("Script carregado do histórico");
+                });
+
+                const runButton = document.createElement("button");
+                runButton.type = "button";
+                runButton.className = "fusion-sql-history-run";
+                runButton.textContent = "▶";
+                runButton.title = "Executar este script";
+                runButton.addEventListener("click", () => {
+                    executeSqlRequest(sql);
+                });
+
+                const deleteButton = document.createElement("button");
+                deleteButton.type = "button";
+                deleteButton.className = "fusion-sql-history-delete";
+                deleteButton.textContent = "×";
+                deleteButton.title = "Remover este script do histórico";
+                deleteButton.addEventListener("click", () => {
+                    sqlHistory = sqlHistory.filter(item => item !== sql);
+                    saveSqlHistory();
+                    renderSqlHistory();
+                });
+
+                item.append(runButton, loadButton, deleteButton);
+                historyList.appendChild(item);
+            });
+
+            const hiddenCount = sqlHistory.length - visibleHistory.length;
+            if (hiddenCount > 0) {
+                const more = document.createElement("button");
+                more.type = "button";
+                more.className = "fusion-sql-history-more";
+                more.textContent = `+ ${hiddenCount} script${hiddenCount === 1 ? "" : "s"} oculto${hiddenCount === 1 ? "" : "s"}`;
+                more.title = "Abrir todos os scripts do histórico";
+                more.setAttribute("aria-label", "Abrir todos os scripts ocultos do histórico");
+                more.addEventListener("click", openSqlHistoryModal);
+                historyList.appendChild(more);
+            }
+        };
+
+        const openSqlHistoryModal = () => {
+            const existing = document.getElementById("fusion-sql-history-modal");
+            if (existing) existing.remove();
+
+            const modal = document.createElement("div");
+            modal.id = "fusion-sql-history-modal";
+            modal.innerHTML = `
+                <section id="fusion-sql-history-dialog" role="dialog" aria-modal="true" aria-label="Histórico completo de scripts">
+                    <header>
+                        <span>Histórico completo</span>
+                        <button id="fusion-sql-history-modal-close" type="button" aria-label="Fechar">×</button>
+                    </header>
+                    <input id="fusion-sql-history-modal-search" type="search" placeholder="Buscar em todos os scripts..." autocomplete="off">
+                    <div id="fusion-sql-history-modal-list"></div>
+                </section>
+            `;
+            document.body.appendChild(modal);
+
+            const list = modal.querySelector("#fusion-sql-history-modal-list");
+            const search = modal.querySelector("#fusion-sql-history-modal-search");
+            const close = () => modal.remove();
+            modal.querySelector("#fusion-sql-history-modal-close").addEventListener("click", close);
+            modal.addEventListener("click", event => {
+                if (event.target === modal) close();
+            });
+
+            const renderModalList = () => {
+                list.innerHTML = "";
+                const query = search.value.trim().toLowerCase();
+                const matches = sqlHistory.filter(sql =>
+                    !query || sql.toLowerCase().includes(query)
+                );
+
+                if (!matches.length) {
+                    list.textContent = "Nenhum script encontrado.";
+                    return;
+                }
+
+                matches.forEach(sql => {
+                    const item = document.createElement("div");
+                    item.className = "fusion-sql-history-modal-item";
+
+                    const run = document.createElement("button");
+                    run.type = "button";
+                    run.className = "fusion-sql-history-run";
+                    run.textContent = "▶";
+                    run.title = "Executar script";
+                    run.addEventListener("click", () => {
+                        close();
+                        executeSqlRequest(sql);
+                    });
+
+                    const load = document.createElement("button");
+                    load.type = "button";
+                    load.className = "fusion-sql-history-load";
+                    load.textContent = sql;
+                    load.addEventListener("click", () => {
+                        sqlInput.value = sql;
+                        sqlInput.dispatchEvent(new Event("input", { bubbles: true }));
+                        sqlInput.focus();
+                        close();
+                    });
+
+                    const remove = document.createElement("button");
+                    remove.type = "button";
+                    remove.className = "fusion-sql-history-delete";
+                    remove.textContent = "×";
+                    remove.title = "Remover script";
+                    remove.addEventListener("click", () => {
+                        sqlHistory = sqlHistory.filter(itemSql => itemSql !== sql);
+                        saveSqlHistory();
+                        renderSqlHistory();
+                        renderModalList();
+                    });
+
+                    item.append(run, load, remove);
+                    list.appendChild(item);
+                });
+            };
+
+            search.addEventListener("input", renderModalList);
+            renderModalList();
+            search.focus();
+        };
+
+        historySearch.addEventListener("input", () => {
+            historyQuery = historySearch.value.trim().toLowerCase();
+            renderSqlHistory();
+        });
+
+        historyClear.addEventListener("click", () => {
+            if (!sqlHistory.length || !window.confirm("Remover todos os scripts do histórico?")) {
+                return;
+            }
+
+            sqlHistory = [];
+            saveSqlHistory();
+            renderSqlHistory();
+        });
+
+        renderSqlHistory();
+
+        lerHistoricoCompartilhado(sqlHistory).then(sharedHistory => {
+            const normalizedHistory = sharedHistory
+                .filter(sql => typeof sql === "string" && sql.trim())
+                .filter((sql, index, list) => list.indexOf(sql) === index);
+
+            if (normalizedHistory.length || !sqlHistory.length) {
+                sqlHistory = normalizedHistory;
+                salvarStorage(SQL_HISTORY_KEY, sqlHistory);
+                renderSqlHistory();
+            } else {
+                salvarHistoricoCompartilhado(sqlHistory);
+            }
+        });
+
+        const executeSqlRequest = async (sql, options = {}) => {
+            const saveHistory = options.saveHistory !== false;
             if (requestInProgress) {
                 setStatus("Já existe uma consulta em andamento", "warning");
                 return;
@@ -3047,6 +3714,9 @@ ORDER BY tran_elapsed_time_seconds DESC;`;
                 }
 
                 updateResults(await response.text());
+                if (saveHistory && !sql.includes("INFORMATION_SCHEMA.COLUMNS")) {
+                    addSqlHistory(sql);
+                }
                 setStatus(
                     `Atualizado às ${new Date().toLocaleTimeString()}`
                 );
@@ -3075,7 +3745,7 @@ ORDER BY tran_elapsed_time_seconds DESC;`;
             sqlInput.value = montarSqlMonitor(environments);
 
             try {
-                await executeSqlRequest(sqlInput.value);
+                await executeSqlRequest(sqlInput.value, { saveHistory: false });
             } finally {
                 if (isVerificationActive()) {
                     scheduleNextVerification();
