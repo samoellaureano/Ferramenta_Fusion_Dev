@@ -1516,6 +1516,12 @@
         intervalSeconds: 1
     };
 
+    const SQL_TABLES_QUERY = `SELECT
+    TABLE_NAME AS table_name
+FROM INFORMATION_SCHEMA.TABLES
+WHERE TABLE_TYPE = 'BASE TABLE'
+ORDER BY TABLE_NAME;`;
+
     const lerStorage = (key, fallback) => {
         try {
             const value = localStorage.getItem(key);
@@ -1762,7 +1768,8 @@ ORDER BY tran_elapsed_time_seconds DESC;`;
         const maxInput = form.querySelector('input[name="max"]');
         const sqlInput = form.querySelector('textarea[name="sql"]');
         const executeButton = form.querySelector(
-            'input[type="submit"], input[type="button"][value="Continuar"]'
+            'input[type="submit"], input[type="button"][value="Continuar"], ' +
+            'button[type="submit"], button:not([type])'
         );
 
         if (!maxInput || !sqlInput || !executeButton) {
@@ -1904,6 +1911,46 @@ ORDER BY tran_elapsed_time_seconds DESC;`;
             color: #e8f1f8;
             font: 13px/1.5 Consolas, "Courier New", monospace;
             resize: vertical;
+        }
+
+        #fusion-sql-editor-wrapper {
+            position: relative;
+        }
+
+        #fusion-sql-table-suggestions {
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 20;
+            display: none;
+            min-width: 240px;
+            max-width: 360px;
+            max-height: 220px;
+            overflow-y: auto;
+            box-sizing: border-box;
+            border: 1px solid #c7ced6;
+            border-radius: 0 0 6px 6px;
+            background: #fff;
+            box-shadow: 0 4px 12px rgba(0,0,0,.16);
+        }
+
+        #fusion-sql-table-suggestions button {
+            display: block;
+            width: 100%;
+            padding: 8px 12px;
+            border: 0;
+            border-bottom: 1px solid #edf0f2;
+            background: #fff;
+            color: #263238;
+            cursor: pointer;
+            text-align: left;
+            font: 13px Consolas, "Courier New", monospace;
+        }
+
+        #fusion-sql-table-suggestions button:hover,
+        #fusion-sql-table-suggestions button.selected {
+            background: #e3f2fd;
+            color: #0d47a1;
         }
 
         .fusion-sql-message {
@@ -2239,9 +2286,239 @@ ORDER BY tran_elapsed_time_seconds DESC;`;
         form.parentNode.insertBefore(shell, form);
         form.id = "fusion-sql-form-wrapper";
 
+        const editorWrapper = document.createElement("div");
+        editorWrapper.id = "fusion-sql-editor-wrapper";
+        sqlInput.parentNode.insertBefore(editorWrapper, sqlInput);
+        editorWrapper.appendChild(sqlInput);
+
+        const tableSuggestions = document.createElement("div");
+        tableSuggestions.id = "fusion-sql-table-suggestions";
+        tableSuggestions.setAttribute("role", "listbox");
+        editorWrapper.appendChild(tableSuggestions);
+
+        const caretMirror = document.createElement("div");
+        caretMirror.setAttribute("aria-hidden", "true");
+        caretMirror.style.cssText = `
+            position:absolute;top:0;left:0;visibility:hidden;
+            pointer-events:none;white-space:pre-wrap;overflow-wrap:break-word;
+        `;
+        editorWrapper.appendChild(caretMirror);
+
+        let tableNames = [];
+        let tableNamesLoading = null;
+        let selectedTableIndex = -1;
+        let tableSuggestionTimer = null;
+
+        const hideTableSuggestions = () => {
+            tableSuggestions.style.display = "none";
+            tableSuggestions.innerHTML = "";
+            selectedTableIndex = -1;
+        };
+
+        const getTableReference = () => {
+            const cursor = sqlInput.selectionStart;
+            const beforeCursor = sqlInput.value.slice(0, cursor);
+            const match = beforeCursor.match(
+                /(?:\bFROM|\bJOIN|\bUPDATE|\bINTO|\bDELETE\s+FROM)\s+([A-Za-z0-9_$.[\]]*)$/i
+            );
+
+            if (!match) return null;
+
+            return {
+                token: match[1],
+                tokenStart: cursor - match[1].length
+            };
+        };
+
+        const chooseTableSuggestion = tableName => {
+            const reference = getTableReference();
+            if (!reference) return;
+
+            const cursor = sqlInput.selectionStart;
+            const value = sqlInput.value;
+            sqlInput.value = value.slice(0, reference.tokenStart) +
+                tableName + value.slice(cursor);
+            const nextCursor = reference.tokenStart + tableName.length;
+            sqlInput.setSelectionRange(nextCursor, nextCursor);
+            sqlInput.focus();
+            hideTableSuggestions();
+        };
+
+        const positionTableSuggestions = () => {
+            if (tableSuggestions.style.display !== "block") return;
+
+            const computedStyle = getComputedStyle(sqlInput);
+            [
+                "fontFamily", "fontSize", "fontWeight", "fontStyle",
+                "lineHeight", "letterSpacing", "textIndent", "textTransform",
+                "paddingTop", "paddingRight", "paddingBottom", "paddingLeft",
+                "borderTopWidth", "borderRightWidth", "borderBottomWidth",
+                "borderLeftWidth", "boxSizing"
+            ].forEach(property => {
+                caretMirror.style[property] = computedStyle[property];
+            });
+            caretMirror.style.width = `${sqlInput.clientWidth}px`;
+            caretMirror.style.height = `${sqlInput.clientHeight}px`;
+            caretMirror.textContent = sqlInput.value.slice(0, sqlInput.selectionStart);
+
+            const caret = document.createElement("span");
+            caret.textContent = "\u200b";
+            caretMirror.appendChild(caret);
+
+            const mirrorRect = caretMirror.getBoundingClientRect();
+            const caretRect = caret.getBoundingClientRect();
+            const wrapperRect = editorWrapper.getBoundingClientRect();
+            const lineHeight = parseFloat(computedStyle.lineHeight) ||
+                parseFloat(computedStyle.fontSize) * 1.5;
+            const maxLeft = Math.max(
+                0,
+                editorWrapper.clientWidth - tableSuggestions.offsetWidth
+            );
+
+            tableSuggestions.style.left = `${Math.min(
+                maxLeft,
+                Math.max(0, caretRect.left - mirrorRect.left - sqlInput.scrollLeft)
+            )}px`;
+            tableSuggestions.style.top = `${Math.max(
+                0,
+                caretRect.top - wrapperRect.top + lineHeight - sqlInput.scrollTop
+            )}px`;
+        };
+
+        const renderTableSuggestions = () => {
+            const reference = getTableReference();
+            if (!reference) {
+                hideTableSuggestions();
+                return;
+            }
+
+            if (!tableNames.length) {
+                if (!tableNamesLoading) {
+                    tableNamesLoading = carregarNomesTabelas()
+                        .finally(() => {
+                            tableNamesLoading = null;
+                        });
+                }
+                hideTableSuggestions();
+                return;
+            }
+
+            const search = reference.token
+                .split(".")
+                .pop()
+                .replace(/[\[\]]/g, "")
+                .toLowerCase();
+            const matches = tableNames
+                .filter(tableName => tableName.toLowerCase().startsWith(search))
+                .slice(0, 12);
+
+            if (!matches.length) {
+                hideTableSuggestions();
+                return;
+            }
+
+            tableSuggestions.innerHTML = "";
+            selectedTableIndex = -1;
+            matches.forEach((tableName, index) => {
+                const option = document.createElement("button");
+                option.type = "button";
+                option.setAttribute("role", "option");
+                option.textContent = tableName;
+                option.addEventListener("mousedown", event => {
+                    event.preventDefault();
+                    chooseTableSuggestion(tableName);
+                });
+                option.addEventListener("mouseenter", () => {
+                    selectedTableIndex = index;
+                    [...tableSuggestions.children].forEach((item, itemIndex) =>
+                        item.classList.toggle("selected", itemIndex === index)
+                    );
+                });
+                tableSuggestions.appendChild(option);
+            });
+            tableSuggestions.style.display = "block";
+            positionTableSuggestions();
+        };
+
+        sqlInput.addEventListener("input", renderTableSuggestions);
+        sqlInput.addEventListener("click", renderTableSuggestions);
+        sqlInput.addEventListener("scroll", positionTableSuggestions);
+        sqlInput.addEventListener("blur", () => {
+            clearTimeout(tableSuggestionTimer);
+            tableSuggestionTimer = setTimeout(hideTableSuggestions, 150);
+        });
+        sqlInput.addEventListener("keydown", event => {
+            if (tableSuggestions.style.display !== "block") return;
+
+            const options = [...tableSuggestions.children];
+            if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+                event.preventDefault();
+                const direction = event.key === "ArrowDown" ? 1 : -1;
+                selectedTableIndex = (selectedTableIndex + direction + options.length) % options.length;
+                options.forEach((option, index) =>
+                    option.classList.toggle("selected", index === selectedTableIndex)
+                );
+                options[selectedTableIndex]?.scrollIntoView({ block: "nearest" });
+                return;
+            }
+
+            if ((event.key === "Enter" || event.key === "Tab") && selectedTableIndex >= 0) {
+                event.preventDefault();
+                chooseTableSuggestion(options[selectedTableIndex].textContent);
+                return;
+            }
+
+            if (event.key === "Escape") {
+                event.preventDefault();
+                hideTableSuggestions();
+            }
+        });
+
+        const carregarNomesTabelas = async () => {
+            try {
+                const requestData = new FormData(form);
+                requestData.set("sql", SQL_TABLES_QUERY);
+                requestData.set("max", "999999999");
+                const response = await fetch(
+                    form.action || window.location.href,
+                    {
+                        method: "POST",
+                        credentials: "same-origin",
+                        body: requestData,
+                        headers: {
+                            "X-Requested-With": "XMLHttpRequest"
+                        }
+                    }
+                );
+
+                if (!response.ok) return;
+
+                const responseDocument = new DOMParser()
+                    .parseFromString(await response.text(), "text/html");
+                const table = responseDocument.querySelector("#resultTable");
+                const rows = table ? [...table.querySelectorAll("tr")] : [];
+                if (rows.length < 2) return;
+
+                const headers = [...rows[0].querySelectorAll("th, td")]
+                    .map(cell => cell.textContent.trim().toLowerCase());
+                const tableNameIndex = headers.findIndex(header =>
+                    header === "table_name" || header === "tablename"
+                );
+                if (tableNameIndex < 0) return;
+
+                tableNames = [...new Set(rows.slice(1)
+                    .map(row => row.querySelectorAll("td")[tableNameIndex]?.textContent.trim())
+                    .filter(Boolean))]
+                    .sort((first, second) => first.localeCompare(second));
+                renderTableSuggestions();
+            } catch (error) {
+                console.debug("Não foi possível carregar nomes de tabelas:", error);
+            }
+        };
+
         const messageBox = document.createElement("div");
         messageBox.id = "fusion-sql-validation-message";
-        form.insertBefore(messageBox, sqlInput);
+        form.insertBefore(messageBox, editorWrapper);
 
         const setStatus = (message, type = "") => {
             status.textContent = message;
@@ -2560,6 +2837,10 @@ ORDER BY tran_elapsed_time_seconds DESC;`;
 
         renderEnvironments();
         updateVerificationButton();
+        tableNamesLoading = carregarNomesTabelas()
+            .finally(() => {
+                tableNamesLoading = null;
+            });
 
         if (isVerificationActive()) {
             setStatus("Monitor ativo");
