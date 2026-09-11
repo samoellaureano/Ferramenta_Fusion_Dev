@@ -182,6 +182,71 @@
         setTimeout(() => toast.remove(), 3000);
     };
 
+    const criarBotaoReportarBug = () => {
+        const reportButton = document.getElementById('fusion-report-bug');
+        const reportStyle = document.getElementById('fusion-report-bug-style');
+        const paginasReportBug = [
+            "/fusion/adm/sql.jsp",
+            "/fusion/adm/tomcatLog.jsp"
+        ];
+        const podeReportarBug = paginasReportBug.some(path =>
+            window.location.pathname.startsWith(path)
+        );
+
+        if (!podeReportarBug) {
+            reportButton?.remove();
+            reportStyle?.remove();
+            return;
+        }
+
+        if (reportButton) return;
+
+        const style = document.createElement('style');
+        style.id = 'fusion-report-bug-style';
+        style.textContent = `
+            #fusion-report-bug {
+                position: fixed;
+                top: 12px;
+                right: 176px;
+                z-index: 2147483646;
+                padding: 7px 10px;
+                border: 1px solid rgba(255,255,255,.35);
+                border-radius: 5px;
+                background: rgba(38,50,56,.88);
+                color: #fff;
+                cursor: pointer;
+                font: 600 11px Arial, sans-serif;
+                opacity: .72;
+                transition: opacity .2s, background .2s;
+            }
+
+            #fusion-report-bug:hover {
+                background: #c62828;
+                opacity: 1;
+            }
+        `;
+        document.head.appendChild(style);
+
+        const button = document.createElement('button');
+        button.id = 'fusion-report-bug';
+        button.type = 'button';
+        button.title = 'Abrir reporte no WhatsApp';
+        button.textContent = 'Reportar bug';
+        button.addEventListener('click', () => {
+            const report = [
+                'Erro encontrado na Ferramenta Fusion DEV',
+                `Página: ${window.location.href}`,
+                `Data e hora: ${new Date().toLocaleString()}`
+            ].join('\n');
+
+            const whatsappUrl =
+                `https://wa.me/5547997386549?text=${encodeURIComponent(report)}`;
+            window.open(whatsappUrl, '_blank');
+        });
+
+        document.body.appendChild(button);
+    };
+
     // ================= FUNÇÕES PRINCIPAIS =================
 
     // Dump NeoObject
@@ -1517,10 +1582,20 @@
     };
 
     const SQL_TABLES_QUERY = `SELECT
-    TABLE_NAME AS table_name
-FROM INFORMATION_SCHEMA.TABLES
-WHERE TABLE_TYPE = 'BASE TABLE'
-ORDER BY TABLE_NAME;`;
+    TABLE_NAME AS table_name,
+    COLUMN_NAME AS column_name
+FROM INFORMATION_SCHEMA.COLUMNS
+ORDER BY TABLE_NAME, ORDINAL_POSITION;`;
+
+    const SQL_KEYWORDS = [
+        "SELECT", "DISTINCT", "FROM", "INNER JOIN", "LEFT JOIN",
+        "RIGHT JOIN", "FULL JOIN", "CROSS JOIN", "WHERE", "AND", "OR",
+        "ON", "AS", "GROUP BY", "ORDER BY", "HAVING", "TOP", "INSERT INTO",
+        "VALUES", "UPDATE", "SET", "DELETE FROM", "LIKE", "IN", "NOT IN",
+        "IS NULL", "IS NOT NULL", "BETWEEN", "CASE", "WHEN", "THEN", "ELSE",
+        "END", "COUNT", "SUM", "AVG", "MIN", "MAX", "CAST", "CONVERT",
+        "UNION", "UNION ALL", "EXISTS", "NOT EXISTS"
+    ];
 
     const lerStorage = (key, fallback) => {
         try {
@@ -2305,9 +2380,12 @@ ORDER BY tran_elapsed_time_seconds DESC;`;
         editorWrapper.appendChild(caretMirror);
 
         let tableNames = [];
+        const tableColumns = Object.create(null);
         let tableNamesLoading = null;
         let selectedTableIndex = -1;
         let tableSuggestionTimer = null;
+        let suggestionMode = "table";
+        let showAllSuggestions = false;
 
         const hideTableSuggestions = () => {
             tableSuggestions.style.display = "none";
@@ -2330,6 +2408,104 @@ ORDER BY tran_elapsed_time_seconds DESC;`;
             };
         };
 
+        const getColumnTables = sql => {
+            const aliases = Object.create(null);
+            const tablePattern = /\b(?:FROM|JOIN)\s+([A-Za-z0-9_$\[\]]+)(?:\s+(?:AS\s+)?([A-Za-z0-9_$\[\]]+))?/gi;
+            const reservedWords = new Set([
+                "WHERE", "JOIN", "INNER", "LEFT", "RIGHT", "FULL", "ON",
+                "GROUP", "ORDER", "HAVING", "UNION", "SET"
+            ]);
+            let match;
+
+            while ((match = tablePattern.exec(sql))) {
+                const tableName = match[1].replace(/[\[\]]/g, "");
+                const alias = match[2] && !reservedWords.has(match[2].toUpperCase())
+                    ? match[2].replace(/[\[\]]/g, "")
+                    : tableName;
+                aliases[alias.toLowerCase()] = tableName.toLowerCase();
+                aliases[tableName.toLowerCase()] = tableName.toLowerCase();
+            }
+
+            return aliases;
+        };
+
+        const getColumnReference = () => {
+            const cursor = sqlInput.selectionStart;
+            const beforeCursor = sqlInput.value.slice(0, cursor);
+            const match = beforeCursor.match(
+                /(?:([A-Za-z0-9_$\[\]]+)\s*\.\s*)?(["']?)([A-Za-z0-9_$]*)$/
+            );
+
+            if (!match) return null;
+
+            const aliases = getColumnTables(beforeCursor);
+            const qualifier = match[1]?.replace(/[\[\]]/g, "").toLowerCase();
+            const isQualified = Boolean(qualifier);
+            const expressionBefore = beforeCursor.slice(0, match.index);
+            const syntaxKeywords = [
+                ...expressionBefore.matchAll(
+                    /\b(SELECT|WHERE|AND|OR|HAVING|ON|SET|GROUP\s+BY|ORDER\s+BY|FROM|JOIN)\b/gi
+                )
+            ];
+            const lastKeyword = syntaxKeywords.at(-1)?.[1]
+                ?.replace(/\s+/g, " ")
+                .toUpperCase();
+            const isColumnContext = new Set([
+                "SELECT", "WHERE", "AND", "OR", "HAVING", "ON", "SET",
+                "GROUP BY", "ORDER BY"
+            ]).has(lastKeyword);
+            if (!isColumnContext) return null;
+
+            if (!isQualified && !match[3] && !/\s$/.test(beforeCursor)) {
+                return null;
+            }
+
+            if (!isQualified && !match[3] && /\s$/.test(beforeCursor)) {
+                const trimmedBeforeCursor = beforeCursor.trim();
+                const previousWord = trimmedBeforeCursor.split(/\s+/).pop();
+                const previousCharacter = trimmedBeforeCursor.slice(-1);
+                const canStartColumn = new Set([
+                    "SELECT", "WHERE", "AND", "OR", "HAVING", "ON", "SET",
+                    "BY"
+                ]).has(previousWord?.toUpperCase()) ||
+                    /[=<>!,+(*/-]/.test(previousCharacter);
+
+                if (!canStartColumn) return null;
+            }
+
+            const tableName = qualifier
+                ? aliases[qualifier] || qualifier
+                : Object.values(aliases).pop();
+            const columns = tableName ? tableColumns[tableName] : null;
+            if (!columns) return null;
+
+            return {
+                tableName,
+                token: match[3],
+                tokenStart: cursor - match[3].length,
+                columns
+            };
+        };
+
+        const getKeywordReference = (allowEmpty = false) => {
+            const cursor = sqlInput.selectionStart;
+            const beforeCursor = sqlInput.value.slice(0, cursor);
+            const match = beforeCursor.match(/([A-Za-z]+)$/);
+            if (!match) {
+                if (!allowEmpty || (beforeCursor && !/\s$/.test(beforeCursor))) return null;
+
+                return {
+                    token: "",
+                    tokenStart: cursor
+                };
+            }
+
+            return {
+                token: match[1],
+                tokenStart: cursor - match[1].length
+            };
+        };
+
         const chooseTableSuggestion = tableName => {
             const reference = getTableReference();
             if (!reference) return;
@@ -2342,6 +2518,59 @@ ORDER BY tran_elapsed_time_seconds DESC;`;
             sqlInput.setSelectionRange(nextCursor, nextCursor);
             sqlInput.focus();
             hideTableSuggestions();
+        };
+
+        const chooseColumnSuggestion = columnName => {
+            const reference = getColumnReference();
+            if (!reference) return;
+
+            const cursor = sqlInput.selectionStart;
+            const value = sqlInput.value;
+            sqlInput.value = value.slice(0, reference.tokenStart) +
+                columnName + value.slice(cursor);
+            const nextCursor = reference.tokenStart + columnName.length;
+            sqlInput.setSelectionRange(nextCursor, nextCursor);
+            sqlInput.focus();
+            hideTableSuggestions();
+        };
+
+        const chooseKeywordSuggestion = keyword => {
+            const reference = getKeywordReference(true);
+            if (!reference) return;
+
+            const cursor = sqlInput.selectionStart;
+            const value = sqlInput.value;
+            const completedKeyword = `${keyword} `;
+            sqlInput.value = value.slice(0, reference.tokenStart) +
+                completedKeyword + value.slice(cursor);
+            const nextCursor = reference.tokenStart + completedKeyword.length;
+            sqlInput.setSelectionRange(nextCursor, nextCursor);
+            sqlInput.focus();
+            hideTableSuggestions();
+        };
+
+        const ordenarSugestoes = (items, search) => {
+            const normalizedSearch = search.toLowerCase();
+
+            return items
+                .filter(item => item.toLowerCase().includes(normalizedSearch))
+                .sort((first, second) => {
+                    const firstLower = first.toLowerCase();
+                    const secondLower = second.toLowerCase();
+                    const firstRank = firstLower === normalizedSearch
+                        ? 0
+                        : firstLower.startsWith(normalizedSearch)
+                            ? 1
+                            : 2;
+                    const secondRank = secondLower === normalizedSearch
+                        ? 0
+                        : secondLower.startsWith(normalizedSearch)
+                            ? 1
+                            : 2;
+
+                    return firstRank - secondRank || first.localeCompare(second);
+                })
+                .slice(0, 12);
         };
 
         const positionTableSuggestions = () => {
@@ -2386,13 +2615,22 @@ ORDER BY tran_elapsed_time_seconds DESC;`;
         };
 
         const renderTableSuggestions = () => {
+            const columnReference = getColumnReference();
             const reference = getTableReference();
-            if (!reference) {
+            const keywordReference = !columnReference && !reference
+                ? getKeywordReference()
+                : null;
+            const allKeywordReference = showAllSuggestions &&
+                !columnReference && !reference && !keywordReference
+                ? { token: "", tokenStart: sqlInput.selectionStart }
+                : null;
+            const activeKeywordReference = keywordReference || allKeywordReference;
+            if (!columnReference && !reference && !activeKeywordReference) {
                 hideTableSuggestions();
                 return;
             }
 
-            if (!tableNames.length) {
+            if (!activeKeywordReference && !tableNames.length) {
                 if (!tableNamesLoading) {
                     tableNamesLoading = carregarNomesTabelas()
                         .finally(() => {
@@ -2403,14 +2641,17 @@ ORDER BY tran_elapsed_time_seconds DESC;`;
                 return;
             }
 
-            const search = reference.token
-                .split(".")
-                .pop()
+            const activeReference = columnReference || reference || activeKeywordReference;
+            const search = activeReference.token
                 .replace(/[\[\]]/g, "")
                 .toLowerCase();
-            const matches = tableNames
-                .filter(tableName => tableName.toLowerCase().startsWith(search))
-                .slice(0, 12);
+            const matches = columnReference
+                ? ordenarSugestoes(columnReference.columns, search)
+                : reference
+                    ? ordenarSugestoes(tableNames, search)
+                    : SQL_KEYWORDS
+                        .filter(keyword => keyword.toLowerCase().startsWith(search))
+                        .slice(0, 12);
 
             if (!matches.length) {
                 hideTableSuggestions();
@@ -2418,15 +2659,40 @@ ORDER BY tran_elapsed_time_seconds DESC;`;
             }
 
             tableSuggestions.innerHTML = "";
-            selectedTableIndex = -1;
+            selectedTableIndex = 0;
+            suggestionMode = columnReference
+                ? "column"
+                : reference
+                    ? "table"
+                    : "keyword";
             matches.forEach((tableName, index) => {
                 const option = document.createElement("button");
                 option.type = "button";
                 option.setAttribute("role", "option");
                 option.textContent = tableName;
+                option.classList.toggle("selected", index === selectedTableIndex);
                 option.addEventListener("mousedown", event => {
                     event.preventDefault();
-                    chooseTableSuggestion(tableName);
+                    event.stopPropagation();
+                    if (columnReference) {
+                        chooseColumnSuggestion(tableName);
+                    } else if (reference) {
+                        chooseTableSuggestion(tableName);
+                    } else {
+                        chooseKeywordSuggestion(tableName);
+                    }
+                });
+                option.addEventListener("click", event => {
+                    if (tableSuggestions.style.display !== "block") return;
+                    event.preventDefault();
+                    event.stopPropagation();
+                    if (columnReference) {
+                        chooseColumnSuggestion(tableName);
+                    } else if (reference) {
+                        chooseTableSuggestion(tableName);
+                    } else {
+                        chooseKeywordSuggestion(tableName);
+                    }
                 });
                 option.addEventListener("mouseenter", () => {
                     selectedTableIndex = index;
@@ -2441,19 +2707,34 @@ ORDER BY tran_elapsed_time_seconds DESC;`;
         };
 
         sqlInput.addEventListener("input", renderTableSuggestions);
-        sqlInput.addEventListener("click", renderTableSuggestions);
+        sqlInput.addEventListener("click", hideTableSuggestions);
         sqlInput.addEventListener("scroll", positionTableSuggestions);
         sqlInput.addEventListener("blur", () => {
             clearTimeout(tableSuggestionTimer);
             tableSuggestionTimer = setTimeout(hideTableSuggestions, 150);
         });
-        sqlInput.addEventListener("keydown", event => {
+        const handleSuggestionKey = event => {
+            if (document.activeElement !== sqlInput) return;
+
+            if (event.ctrlKey && (event.key === " " || event.code === "Space")) {
+                event.preventDefault();
+                event.stopPropagation();
+                showAllSuggestions = true;
+                renderTableSuggestions();
+                showAllSuggestions = false;
+                return;
+            }
+
             if (tableSuggestions.style.display !== "block") return;
 
             const options = [...tableSuggestions.children];
-            if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+            if (event.key === "ArrowDown" || event.code === "ArrowDown" ||
+                event.key === "ArrowUp" || event.code === "ArrowUp") {
                 event.preventDefault();
-                const direction = event.key === "ArrowDown" ? 1 : -1;
+                event.stopPropagation();
+                const direction = event.key === "ArrowDown" || event.code === "ArrowDown"
+                    ? 1
+                    : -1;
                 selectedTableIndex = (selectedTableIndex + direction + options.length) % options.length;
                 options.forEach((option, index) =>
                     option.classList.toggle("selected", index === selectedTableIndex)
@@ -2462,17 +2743,29 @@ ORDER BY tran_elapsed_time_seconds DESC;`;
                 return;
             }
 
-            if ((event.key === "Enter" || event.key === "Tab") && selectedTableIndex >= 0) {
+            if ((event.key === "Enter" || event.code === "Enter" ||
+                event.key === "Tab" || event.code === "Tab") && selectedTableIndex >= 0) {
                 event.preventDefault();
-                chooseTableSuggestion(options[selectedTableIndex].textContent);
+                event.stopPropagation();
+                const selectedValue = options[selectedTableIndex].textContent;
+                if (suggestionMode === "column") {
+                    chooseColumnSuggestion(selectedValue);
+                } else if (suggestionMode === "table") {
+                    chooseTableSuggestion(selectedValue);
+                } else {
+                    chooseKeywordSuggestion(selectedValue);
+                }
                 return;
             }
 
-            if (event.key === "Escape") {
+            if (event.key === "Escape" || event.code === "Escape") {
                 event.preventDefault();
+                event.stopPropagation();
                 hideTableSuggestions();
             }
-        });
+        };
+
+        document.addEventListener("keydown", handleSuggestionKey, true);
 
         const carregarNomesTabelas = async () => {
             try {
@@ -2504,7 +2797,21 @@ ORDER BY tran_elapsed_time_seconds DESC;`;
                 const tableNameIndex = headers.findIndex(header =>
                     header === "table_name" || header === "tablename"
                 );
-                if (tableNameIndex < 0) return;
+                const columnNameIndex = headers.findIndex(header =>
+                    header === "column_name" || header === "columnname"
+                );
+                if (tableNameIndex < 0 || columnNameIndex < 0) return;
+
+                rows.slice(1).forEach(row => {
+                    const cells = row.querySelectorAll("td");
+                    const tableName = cells[tableNameIndex]?.textContent.trim();
+                    const columnName = cells[columnNameIndex]?.textContent.trim();
+                    if (!tableName || !columnName) return;
+
+                    const key = tableName.toLowerCase();
+                    if (!tableColumns[key]) tableColumns[key] = [];
+                    tableColumns[key].push(columnName);
+                });
 
                 tableNames = [...new Set(rows.slice(1)
                     .map(row => row.querySelectorAll("td")[tableNameIndex]?.textContent.trim())
@@ -2855,6 +3162,7 @@ ORDER BY tran_elapsed_time_seconds DESC;`;
          * portanto permanece disponível para reativação.
          */
         criarControleExtensao();
+        criarBotaoReportarBug();
 
         if (extensaoDesativada()) {
             return;
